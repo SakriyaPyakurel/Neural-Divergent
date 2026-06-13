@@ -28,3 +28,12 @@ class Memory(BaseModel):
     )
     timestamp: datetime = Field(default_factory= lambda: datetime.now(UTC)) 
     related_memories: List[str] = []
+
+class SemanticRepresentation(BaseModel):
+    subject: str
+    relationship: str
+    object: str
+    event_type: Optional[str]
+    reason: Optional[str]
+    confidence: float
+    metadata: dict
