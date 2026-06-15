@@ -29,6 +29,14 @@ class Memory(BaseModel):
     timestamp: datetime = Field(default_factory= lambda: datetime.now(UTC)) 
     related_memories: List[str] = []
 
+class CandidateRelationship(BaseModel):
+    # An intermediate and pure structural representation of a sentence before being categorized 
+    subject:str 
+    verb:str 
+    object:str 
+    reason: Optional[str] = None 
+    is_negated: bool = False
+
 class SemanticRepresentation(BaseModel):
     subject: str
     relationship: str
