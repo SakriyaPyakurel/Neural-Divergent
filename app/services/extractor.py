@@ -10,14 +10,21 @@ class LocalExtractionEngine:
     def extract_sirs(self,raw_message:str) -> List[SemanticRepresentation]:
         # The main orchestation method
         doc,reason_text,exclude_ids = self.parse_message(raw_message) 
-        candidates : List[CandidateRelationship] = []
 
+        candidates : List[CandidateRelationship] = []
         # Merging the splitted extractions 
         candidates.extend(self.detect_attribute_relationships(doc,reason_text,exclude_ids)) 
         candidates.extend(self.detect_action_relationships(doc,reason_text,exclude_ids))
 
-   
-        final_sirs = self.build_candidate_sirs(candidates)
+        # Passing candidates through the Semantic Transformer
+        normalized_candidates = self.normalize_semantics(candidates) 
+
+        # Passing normalized candidates to the builder
+        final_sirs = self.build_candidate_sirs(normalized_candidates)
+
+        # Enriching metadata
+        for sir in final_sirs:
+            sir.metadata["extraction_method"] = "dependency_parse_with_semantic_normalization" 
         return self.assign_confidence(final_sirs) 
          
     def parse_message(self, raw_message: str):
@@ -94,14 +101,23 @@ class LocalExtractionEngine:
 
                 # Finding the subject 
                 subject_tokens = [c.text for c in token.children if c.dep_ in ["nsubj","nsubjpass"]] 
-                subject = " ".join(subject_tokens)
 
-                # handling compound statements 
+                subject = ""
+                for child in token.children:
+                    if child.dep_ in ["nsubj", "nsubjpass"]:
+                        raw_subject = " ".join([t.text for t in child.subtree if t.i not in exclude_ids])
+                        subject = raw_subject.replace(" - ", "-")
+                        break
+                
+                #Using Fallback for compound subjects (conjunctions)
                 if not subject:
                     if token.dep_ == "conj":
-                        head_subj = [c.text for c in token.head.children if c.dep_ in ["nsubj","nsubjpass"]]
-                        subject = " ".join(head_subj) if head_subj else "user" 
-                    else:
+                        for child in token.head.children:
+                            if child.dep_ in ["nsubj", "nsubjpass"]:
+                                raw_subject = " ".join([t.text for t in child.subtree if t.i not in exclude_ids])
+                                subject = raw_subject.replace(" - ", "-")
+                                break
+                    if not subject:
                         subject = "user" 
 
                 # Collecting all predicate components
@@ -128,6 +144,54 @@ class LocalExtractionEngine:
                     ))
 
         return relationships
+    
+    def normalize_semantics(self, candidates: List[CandidateRelationship]) -> List[CandidateRelationship]:
+        """Dynamically transforms raw grammatical relationships into generalized semantic truths."""
+        normalized = []
+        
+        # Expanded user identity matrix
+        USER_PRONOUNS = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours", "ourselves"}
+
+        for candidate in candidates:
+            # Tokenize the subject phrase to scan for user-centric ownership
+            subj_words = set(candidate.subject.lower().split())
+            is_user_centric = bool(subj_words.intersection(USER_PRONOUNS))
+
+            # State-of-Being Verbs (is/am/are/be)
+            if candidate.verb in ["is", "am", "are", "be"]:
+                
+                if is_user_centric:
+                    # ONLY runs if the phrase belongs to the user profile
+                    subj_doc = self.nlp(candidate.subject)
+                    core_trait_parts = []
+                    
+                    for token in subj_doc:
+                        if token.dep_ == "ROOT" and token.pos_ in ["NOUN", "PROPN"]:
+                            # Capturing critical adjectival descriptors (e.g., "favorite", "primary")
+                            modifiers = [child.lemma_ for child in token.children if child.dep_ in ["amod", "compound"]]
+                            core_trait_parts.extend(modifiers)
+                            core_trait_parts.append(token.lemma_)
+                            break
+                    
+                    if core_trait_parts:
+                        candidate.subject = "user"
+                        candidate.verb = "_".join(core_trait_parts)
+                    else:
+                        candidate.subject = "user"  # Safe fallback if no root noun is extracted
+                        
+                else:
+                    # PATH B: Knowledge Fact Protection Firewall
+                    pass
+            else:
+                # Standardize core operational actors down to the system user
+                if candidate.subject.lower() in ["i", "we"]:
+                    candidate.subject = "user"
+            
+            # Appending the clean, normalized candidate to our processing stream
+            normalized.append(candidate)
+            
+        return normalized
+                  
 
     def build_candidate_sirs(self,candidates:List[CandidateRelationship])->List[SemanticRepresentation]:
         # Converting structured intermediate models into final SIRs
@@ -149,7 +213,7 @@ class LocalExtractionEngine:
         return sirs 
     
     def assign_confidence(self,sirs:List[SemanticRepresentation]) -> List[SemanticRepresentation]:
-        # Step 4: calculating probabilistic certainity 
+        # Calculating probabilistic certainity 
         for sir in sirs:
             # Simple rule based calculation
             base_score = 0.85 
