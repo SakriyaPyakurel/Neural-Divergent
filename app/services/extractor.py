@@ -100,8 +100,6 @@ class LocalExtractionEngine:
                 is_negated = any(child.dep_ == "neg" for child in token.children)
 
                 # Finding the subject 
-                subject_tokens = [c.text for c in token.children if c.dep_ in ["nsubj","nsubjpass"]] 
-
                 subject = ""
                 for child in token.children:
                     if child.dep_ in ["nsubj", "nsubjpass"]:
@@ -154,7 +152,7 @@ class LocalExtractionEngine:
 
         for candidate in candidates:
             # Tokenize the subject phrase to scan for user-centric ownership
-            subj_words = set(candidate.subject.lower().split())
+            subj_words = set(candidate.subject.lower().replace("'", " ").replace("’", " ").split())
             is_user_centric = bool(subj_words.intersection(USER_PRONOUNS))
 
             # State-of-Being Verbs (is/am/are/be)
