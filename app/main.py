@@ -48,5 +48,5 @@ if __name__ == "__main__":
         if not sirs:
             print("Extracted: [NO RELATIONSHIPS DETECTED]")
         for sir in sirs:
-            print(f"Extracted: subject='{sir.subject}' relationship='{sir.relationship}' object='{sir.object}' reason='{sir.reason}' negated={sir.metadata['negated']}")
+            print(f"Extracted: subject='{sir.subject}' relationship='{sir.relationship}' object='{sir.object}' reason='{sir.reason}' event_type='{sir.event_type}' confidence={sir.metadata['classification_confidence']} negated={sir.metadata['negated']}")
         print("-" * 50 + "\n")

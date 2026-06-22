@@ -1,11 +1,16 @@
 import spacy
-from typing import List 
+from typing import List,Dict,Any
+from transformers import pipeline
 from models.memory import SemanticRepresentation,CandidateRelationship 
 
 class LocalExtractionEngine:
     def __init__(self):
         # loading spacy's lightweight, , fast English dependency parser locally
         self.nlp = spacy.load('en_core_web_sm') 
+        print("Loading AI cognitive classifier. Can take a minute on first try.")
+        self.classifier = pipeline("zero-shot-classification",model="facebook/bart-large-mnli") 
+        # Available Memory categories(Kept small for now) 
+        self.memory_categories = ["Identity", "Preference", "Project", "Knowledge", "Action"]
     
     def extract_sirs(self,raw_message:str) -> List[SemanticRepresentation]:
         # The main orchestation method
@@ -21,6 +26,9 @@ class LocalExtractionEngine:
 
         # Passing normalized candidates to the builder
         final_sirs = self.build_candidate_sirs(normalized_candidates)
+
+        # Routing the clean data to the event_classifier 
+        final_sirs = self.classify_event_type(final_sirs,raw_message)
 
         # Enriching metadata
         for sir in final_sirs:
@@ -210,6 +218,62 @@ class LocalExtractionEngine:
             ))
         return sirs 
     
+    def classify_event_type(self,sirs:List[SemanticRepresentation],original_text:str)->List[SemanticRepresentation]:
+        # Utilizes a Zero-Shot LLM to categorize the extracted memory into a database bucket
+
+        # Determining user-centricity once using existing matrix
+        USER_PRONOUNS = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours", "ourselves"}
+        words = set(original_text.lower().replace("'"," ").split())   
+        is_user_centric = bool(words.intersection(USER_PRONOUNS))     
+        
+        # Utilizing core high-signal keywords 
+        PREFERENCE_SIGNALS = {
+            "favorite", "prefer", "love", "like", "dislike", "hate", "enjoy", "despise"
+        }
+        IDENTITY_SIGNALS = {
+            # Core identity
+            "name", "age", "birthday", "gender", "pronoun",
+            # Professional identity
+            "profession", "occupation", "role", "title", "owner", "developer",
+            # Geographic/Background identity
+            "hometown", "nationality", "citizen"
+        }
+        for sir in sirs:
+            # Firewall check for 'Knowledge/Facts'
+            if sir.relationship == 'is' and not is_user_centric:
+                sir.event_type = "Knowledge" 
+                sir.metadata['classification_confidence'] = 1.0000
+                continue
+            # Instantly catching obvious preferences or core identity markers
+            if words.intersection(PREFERENCE_SIGNALS):
+                sir.event_type = "Preference"
+                sir.metadata['classification_confidence'] = 1.0000
+                continue
+            elif words.intersection(IDENTITY_SIGNALS) and "store" not in original_text.lower():
+                sir.event_type = "Identity"
+                sir.metadata['classification_confidence'] = 1.0000
+                continue
+            # For complex, dynamic action and project classifications
+            label_map = {
+                "working on a specific project, company, website, or business task": "Project",
+                "performing a general action, event, or change": "Action"
+            }
+            # Passing the pristine original text so the model has maximum grammatical signal
+            result = self.classifier(
+                original_text,
+                candidate_labels=list(label_map.keys()),
+                hypothesis_template="This text describes someone {}.",
+                multi_label=False
+            )
+            
+            best_desc_label = result['labels'][0] 
+            confidence = result['scores'][0]
+
+            #updating the SIR
+            sir.event_type = label_map[best_desc_label]
+            sir.metadata['classification_confidence'] = round(confidence,4) 
+        return sirs
+
     def assign_confidence(self,sirs:List[SemanticRepresentation]) -> List[SemanticRepresentation]:
         # Calculating probabilistic certainity 
         for sir in sirs:
