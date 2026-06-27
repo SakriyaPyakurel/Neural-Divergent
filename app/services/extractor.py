@@ -13,7 +13,7 @@ class LocalExtractionEngine:
         self.memory_categories = ["Identity", "Preference", "Project", "Knowledge", "Action"]
     
     def extract_sirs(self,raw_message:str) -> List[SemanticRepresentation]:
-        # The main orchestation method
+        """Main orchestation method"""
         doc,reason_text,exclude_ids = self.parse_message(raw_message) 
 
         candidates : List[CandidateRelationship] = []
@@ -36,7 +36,7 @@ class LocalExtractionEngine:
         return self.assign_confidence(final_sirs) 
          
     def parse_message(self, raw_message: str):
-        # Extracting the clause dynamically
+        """Extracting the clause dynamically"""
         doc = self.nlp(raw_message)
         reason_text = None
         exclude_ids = set()
@@ -54,7 +54,7 @@ class LocalExtractionEngine:
         return doc, reason_text, exclude_ids
     
     def detect_attribute_relationships(self,doc,reason_text:str,exclude_ids:set)->List[CandidateRelationship]:
-        # handles identity and knowledge both
+        "Handles identity and knowledge both"""
         relationships = [] 
         for token in doc:
             # Ignoring tokens living inside the reason clause
@@ -92,7 +92,7 @@ class LocalExtractionEngine:
         return relationships
     
     def detect_action_relationships(self,doc,reason_text:str,exclude_ids:set)->List[CandidateRelationship]:
-        # handles actions, preferences and compound statements 
+        """Handles actions, preferences and compound statements""" 
         relationships = [] 
         for token in doc:
             # masking out reason clause elements
@@ -200,7 +200,7 @@ class LocalExtractionEngine:
                   
 
     def build_candidate_sirs(self,candidates:List[CandidateRelationship])->List[SemanticRepresentation]:
-        # Converting structured intermediate models into final SIRs
+        """Converting structured intermediate models into final SIRs"""
         sirs = [] 
         for candidate in candidates:
             # Apply negation to the metadata and adjust the relationship mapping
@@ -219,7 +219,7 @@ class LocalExtractionEngine:
         return sirs 
     
     def classify_event_type(self,sirs:List[SemanticRepresentation],original_text:str)->List[SemanticRepresentation]:
-        # Utilizes a Zero-Shot LLM to categorize the extracted memory into a database bucket
+        """Utilizes a Zero-Shot LLM to categorize the extracted memory into a database bucket"""
 
         # Determining user-centricity once using existing matrix
         USER_PRONOUNS = {"i", "me", "my", "mine", "myself", "we", "us", "our", "ours", "ourselves"}
@@ -275,13 +275,53 @@ class LocalExtractionEngine:
         return sirs
 
     def assign_confidence(self,sirs:List[SemanticRepresentation]) -> List[SemanticRepresentation]:
-        # Calculating probabilistic certainity 
+        """
+        Computes mathemathical confidence score for each extracted Semantic Information Representation(SIR)
+
+        Evaluates:
+        -> Syntatic Directness: Direct active clauses score higher than passive or compound classes
+        -> Pronomial Ambiguity: Explicit names or direct 'user' mappings score higher than ambiguous nouns.
+        -> Polarity Risk: Negated statements carry a slight penalty due to polarity risks in parsing.
+        -> Explanatory  Context: Semantic reasons('because','since') increases confidence.
+        """
         for sir in sirs:
-            # Simple rule based calculation
-            base_score = 0.85 
-            if sir.reason:
-                base_score+= 0.10 # Higher confidence if reason is provided 
-            sir.confidence = min(base_score,0.99) # Should Never be 1.0 
+            # Starting with a strong baseline confidence
+            base_score = 0.80
+
+            # Subject Quality and Ambiguity
+            subj_lower = sir.subject.lower() 
+            if subj_lower == "user":
+                # Direct first person pronouns mapped to "user" are highly reliable
+                base_score+=0.10
+            elif len(subj_lower.split()) > 3:
+                # Excessive long subjects indicate messy dependency subtree parsing
+                base_score-=0.15
+
+            # Relationship/Predicate complexity
+            pred_words = sir.relationship.split("_")
+            if any(w in ["is","am","was","are","were"] for w in pred_words):
+                # Copular identity claims are gramatically stable and easy to extract
+                base_score+=0.05
+            if len(pred_words)>3:
+                # Multi-word verbs combined with helper prepositions are noisier to parse
+                base_score-=0.10
+
+            # Polarity and negation risks
+            if sir.metadata.get("negated",False):
+                # Negated states(like not,never) are slightly prone to edge-case parsing errors
+                base_score-=0.05
+
+            # Casuality and reasoning Boost
+            if sir.reason is not None:
+                # Statements containing structured explanations (because,since,due to) are highly delibrate and carry rich cognitive intent
+                base_score+=0.05
+
+            # Short-circuit deterministic Knowledge Firewall
+            if sir.subject != "user" and sir.relationship == "is" and sir.reason is None:
+                base_score=1.00
+               
+            # Bounding confidence strictly between 0.10 and 1.00
+            sir.confidence = round(max(0.10,min(1.00,base_score)),4)
         return sirs
 
 
