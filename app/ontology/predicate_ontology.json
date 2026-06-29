@@ -1,0 +1,189 @@
+{
+  "name": {
+    "category": "identity",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": false,
+    "graph_node_type": "IDENTITY",
+    "description": "The user's preferred or legal name."
+  },
+  "birthday": {
+    "category": "identity",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": false,
+    "graph_node_type": "IDENTITY",
+    "description": "The day or date of birth of the subject."
+  },
+  "born_on": {
+    "category": "identity",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": false,
+    "graph_node_type": "IDENTITY",
+    "description": "The historical date of birth or creation."
+  },
+  "nationality": {
+    "category": "identity",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": true,
+    "supports_reason": false,
+    "graph_node_type": "IDENTITY",
+    "description": "The national identity or country of origin."
+  },
+  "allergic_to": {
+    "category": "health",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "MEDICAL_FACT",
+    "description": "Allergens or physical sensitivities."
+  },
+  "allergies": {
+    "category": "health",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "MEDICAL_FACT",
+    "description": "Listing of allergic conditions."
+  },
+  "favorite_language": {
+    "category": "preference",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "PREFERENCE",
+    "description": "Preferred linguistic medium of communication."
+  },
+  "favorite_programming_language": {
+    "category": "preference",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "PREFERENCE",
+    "description": "Preferred primary code tool or system."
+  },
+  "favorite_editor": {
+    "category": "preference",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "PREFERENCE",
+    "description": "Preferred text editor or IDE choice."
+  },
+  "favorite_os": {
+    "category": "preference",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "PREFERENCE",
+    "description": "Primary development or desktop operating system."
+  },
+  "likes": {
+    "category": "preference",
+    "importance": "MEDIUM",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "INTEREST",
+    "description": "General personal affinity toward an item or concept."
+  },
+  "hates": {
+    "category": "preference",
+    "importance": "MEDIUM",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "INTEREST",
+    "description": "General aversion toward an item or concept."
+  },
+  "working_on": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "ACTIVITY",
+    "description": "Active tasks, engineering efforts, or projects."
+  },
+  "debugging": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "ACTIVITY",
+    "description": "Temporary troubleshooting of active code structures."
+  },
+  "using": {
+    "category": "project",
+    "importance": "LOW",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "TOOL_USAGE",
+    "description": "The transient use of software, services, or packages."
+  },
+  "trying": {
+    "category": "project",
+    "importance": "LOW",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "TOOL_USAGE",
+    "description": "Fleeting testing or experimentation with a feature."
+  },
+  "testing": {
+    "category": "project",
+    "importance": "LOW",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "TOOL_USAGE",
+    "description": "Short-term software test cycles."
+  }
+}
