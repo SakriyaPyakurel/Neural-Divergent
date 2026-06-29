@@ -112,6 +112,9 @@ class MemoryDecisionEngine:
         Returns:
             A tuple of (action_taken,memory_id)
         """
+        # Confidence Gate(Rejecting hallucinations before they enter storage) 
+        if confidence<0.60:
+            return "REJECTED_LOW_CONFIDENCE",None
         # Cleaning and normalizing strings to prevent whitespace-mismatched duplicates
         subj_clean = subject.strip() 
         pred_clean = predicate.strip().lower() 
