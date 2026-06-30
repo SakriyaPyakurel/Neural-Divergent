@@ -1,5 +1,7 @@
 import re 
 from typing import Dict,Any,Tuple,Optional
+import os
+import json
 
 class RetentionPolicy:
     """Decoupled Retention Policies representing how long a memory should be kept."""
@@ -25,6 +27,7 @@ class ImportanceLevel:
             "LOW":cls.LOW,
             "NOISE":cls.NOISE
         }
+        return mapping.get(level_str.upper(), cls.MEDIUM)
 
 class SemanticRepresentation:
     """Standardized semantic payload extracted from the linguistic parsing layer."""
@@ -34,6 +37,7 @@ class SemanticRepresentation:
         self.subject = subject.strip() 
         self.relationship = relationship.strip().lower() 
         self.object = obj.strip()
+        self.source_text = source_text.strip()
         self.confidence = confidence
         self.reason = reason
         self.metadata = metadata or {}
@@ -92,5 +96,45 @@ class ImportanceEvaluationEngine:
     Dynamically loads and evaluates semamtic triples against Neural divergent's structural ontology
     """ 
     def __init__(self,ontology_path:str="app/ontology/predicate_ontology.json"):
-        pass # yet to be written along with ontology loader function
+        self.ontology_path = ontology_path
+        self.registry = self._load_ontology()
 
+        self.importance_evaluator = ImportanceEvaluator(self.registry)
+        self.retention_evaluator = RetentionEvaluator(self.registry)
+
+    def _load_ontology(self) -> Dict[str,Dict[str,Any]]:
+        """Loads and parses the json ontology file with an in-memory hard fallback.""" 
+        if os.path.exists(self.ontology_path):
+            try:
+                with open(self.ontology_path,'r',encoding='utf-8') as f:
+                    return json.load(f)
+            except Exception as e:
+                print(f"Warning: Failed to load ontology file at {self.ontology_path} : {e}")
+        
+        # Hard fallback to prevent crash if the dependency tree is decoupled
+        return {
+            "name":{"importance":"CRITICAL","retention":"LONG_TERM"},
+            "favorite_language":{"importance":"HIGH","retention":"LONG_TERM"},
+            "working_on":{"importance":"MEDIUM","retention":"SHORT_TERM"}
+        }  
+    
+    def evaluate_representation(self,sir:SemanticRepresentation) -> Tuple[float,str]:
+        """
+        Processes the semantic representation throughly a highly optimized sequence.
+
+        Returns:
+            A tuple of (initial_importance_score: float , retention_policy: str)
+        """
+        # Fail Fast : Empty Object Parsing Noise
+        if not sir.object or len(sir.object.strip()) == 0:
+            return ImportanceLevel.NOISE, RetentionPolicy.EPHEMERAL
+        
+        # Fail Fast : Parsing Integrity Gate (Severe Parse Failures) 
+        if sir.confidence < 0.40:
+            return ImportanceLevel.NOISE, RetentionPolicy.EPHEMERAL
+        
+        # Calculating Initial Decoupled Prior and Retention
+        importance_score = self.importance_evaluator.calculate(sir) 
+        retention_policy = self.retention_evaluator.determine_policy(sir) 
+
+        return importance_score, retention_policy
