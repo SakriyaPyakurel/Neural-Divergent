@@ -1,7 +1,7 @@
 import spacy
-from typing import List,Dict,Any
+from typing import List
 from transformers import pipeline
-from models.memory import SemanticRepresentation,CandidateRelationship 
+from models.memory import SemanticRepresentation,CandidateRelationship
 
 class LocalExtractionEngine:
     def __init__(self):
@@ -211,6 +211,7 @@ class LocalExtractionEngine:
                 subject = candidate.subject,
                 relationship=final_relationship,
                 object=candidate.object,
+                source_text=None, # will be filled in classify_event_type method
                 event_type=None, # will be decided later on by the classifier
                 reason=candidate.reason,
                 confidence = 0.0, # Placeholder, will be handled in the assign_confidence stage
@@ -270,6 +271,7 @@ class LocalExtractionEngine:
             confidence = result['scores'][0]
 
             #updating the SIR
+            sir.source_text = original_text
             sir.event_type = label_map[best_desc_label]
             sir.metadata['classification_confidence'] = round(confidence,4) 
         return sirs
