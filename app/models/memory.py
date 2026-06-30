@@ -41,6 +41,7 @@ class SemanticRepresentation(BaseModel):
     subject: str
     relationship: str
     object: str
+    source_text:str
     event_type: Optional[str]
     reason: Optional[str]
     confidence: float
