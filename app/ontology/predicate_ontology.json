@@ -44,7 +44,7 @@
     "description": "The national identity or country of origin."
   },
   "allergic_to": {
-    "category": "health",
+    "category": "knowledge",
     "importance": "CRITICAL",
     "retention": "LONG_TERM",
     "exclusive": false,
@@ -55,7 +55,7 @@
     "description": "Allergens or physical sensitivities."
   },
   "allergies": {
-    "category": "health",
+    "category": "knowledge",
     "importance": "CRITICAL",
     "retention": "LONG_TERM",
     "exclusive": false,
@@ -109,7 +109,7 @@
     "graph_node_type": "PREFERENCE",
     "description": "Primary development or desktop operating system."
   },
-  "likes": {
+  "like": {
     "category": "preference",
     "importance": "MEDIUM",
     "retention": "LONG_TERM",
@@ -120,7 +120,7 @@
     "graph_node_type": "INTEREST",
     "description": "General personal affinity toward an item or concept."
   },
-  "hates": {
+  "hate": {
     "category": "preference",
     "importance": "MEDIUM",
     "retention": "LONG_TERM",
@@ -153,7 +153,7 @@
     "graph_node_type": "ACTIVITY",
     "description": "Temporary troubleshooting of active code structures."
   },
-  "using": {
+  "use": {
     "category": "project",
     "importance": "LOW",
     "retention": "SHORT_TERM",
@@ -164,7 +164,7 @@
     "graph_node_type": "TOOL_USAGE",
     "description": "The transient use of software, services, or packages."
   },
-  "trying": {
+  "try": {
     "category": "project",
     "importance": "LOW",
     "retention": "SHORT_TERM",
@@ -175,7 +175,7 @@
     "graph_node_type": "TOOL_USAGE",
     "description": "Fleeting testing or experimentation with a feature."
   },
-  "testing": {
+  "test": {
     "category": "project",
     "importance": "LOW",
     "retention": "SHORT_TERM",
@@ -185,5 +185,214 @@
     "supports_reason": true,
     "graph_node_type": "TOOL_USAGE",
     "description": "Short-term software test cycles."
+  },
+"age": {
+    "category": "identity",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": false,
+    "graph_node_type": "IDENTITY",
+    "description": "The current age of the user."
+  },
+  "primary_business": {
+    "category": "identity",
+    "importance": "CRITICAL",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "OCCUPATION",
+    "description": "The main commercial enterprise or platform the user owns or manages."
+  },
+  "primary_category": {
+    "category": "identity",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": true,
+    "allow_multiple": false,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "BUSINESS_DOMAIN",
+    "description": "The overarching industry or sector of operation."
+  },
+  "managing": {
+    "category": "project",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "RESPONSIBILITY",
+    "description": "Platforms, websites, or teams currently under the user's administration."
+  },
+  "selling": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "COMMERCE",
+    "description": "Specific product categories, physical goods, or services offered."
+  },
+  "designing": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "ARCHITECTURE",
+    "description": "Creating wireframes, system models, or data flow diagrams."
+  },
+  "processing": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "DATA_ENGINEERING",
+    "description": "Handling, extracting, or structuring large datasets and dictionaries."
+  },
+  "analyzing": {
+    "category": "experience",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "ANALYTICS",
+    "description": "Reviewing performance reports, SEO metrics, or business dashboards."
+  },
+  "optimizing": {
+    "category": "project",
+    "importance": "HIGH",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "MAINTENANCE",
+    "description": "Improving existing systems, search rankings, or code efficiency."
+  },
+  "extract": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "DATA_PIPELINE",
+    "description": "Pulling structured or unstructured data from documents, PDFs, or APIs."
+  },
+  "script": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "AUTOMATION",
+    "description": "Writing standalone files (e.g., .py) for data transformation or task automation."
+  },
+  "compile": {
+    "category": "project",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "KNOWLEDGE_BASE",
+    "description": "Aggregating large lists, such as comprehensive dictionaries or industry codes."
+  },
+  "model": {
+    "category": "project",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "ARCHITECTURE",
+    "description": "Drafting multi-level system diagrams (e.g., DFD Level 0, 1, 2) and logical flows."
+  },
+  "wireframe": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "UI_DESIGN",
+    "description": "Converting backend flows or structural ideas into visual interface designs."
+  },
+  "operate": {
+    "category": "experience",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "BUSINESS_OPERATION",
+    "description": "Active, ongoing management of a digital storefront or application."
+  },
+  "track": {
+    "category": "project",
+    "importance": "MEDIUM",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": false,
+    "supports_reason": true,
+    "graph_node_type": "METRICS",
+    "description": "Monitoring specific SEO performance, analytics dashboards, or traffic."
+  },
+  "stock": {
+    "category": "project",
+    "importance": "LOW",
+    "retention": "EPHEMERAL",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "INVENTORY",
+    "description": "Specific items (electronics, home essentials, fashion) held in inventory."
+  },
+  "plan": {
+    "category": "decision",
+    "importance": "HIGH",
+    "retention": "SHORT_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "FUTURE_INTENT",
+    "description": "Future tasks, roadmaps, or scheduled engineering goals."
+  },
+  "learn": {
+    "category": "experience",
+    "importance": "HIGH",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "SKILL_ACQUISITION",
+    "description": "Frameworks, languages, or concepts currently being studied."
   }
 }

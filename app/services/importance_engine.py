@@ -73,7 +73,7 @@ class ImportanceEvaluator:
         """Calculates importance prior.
            Accepts dynamic active_contexts so the engine doesn't hardcode domain knowledge
         """
-        entry = self.registry.get(sir.relationship) 
+        entry = self.registry.get(sir.relationship.lower()) 
 
         # Determine the dynamic base importance from the ontology registry
         if entry:
@@ -103,7 +103,7 @@ class RetentionEvaluator:
         self.registry = registry
 
     def determine_policy(self,sir:SemanticRepresentation)->str:
-        entry = self.registry.get(sir.relationship) 
+        entry = self.registry.get(sir.relationship.lower()) 
 
         # Translating string from registry to actual Retention policy
         default_policy = entry.get("retention","SHORT_TERM") if entry else RetentionPolicy.SHORT_TERM
