@@ -1,14 +1,14 @@
-import logging
 from typing import List,Dict,Any,Tuple,Optional
 from dataclasses import dataclass
-
+import logging
 #Importing finalized cognitive modules
-from database import MemoryDatabase 
 from extractor import LocalExtractionEngine
+from semantic_classifier import SemanticClassifier
 from importance_engine import ImportanceEstimator,RetentionPolicy,OntologyLoader
 from decision_engine import MemoryDecisionEngine
+from models.memory import MemoryCategory
 
-logger = logging.getLogger("NeuralDivergent.Orchestrator") 
+logger = logging.getLogger('NeuralDivergent.Orchestrator')
 
 @dataclass
 class MemoryProcessingResult:
@@ -28,12 +28,14 @@ class NeuralDivergentOrchestrator:
     Delegates work strictly to injected cognitive engines.
    """
    def __init__(self,extractor:LocalExtractionEngine,
+                classifier:SemanticClassifier,
                 importance_estimator:ImportanceEstimator,
                 decision_engine: MemoryDecisionEngine,
                 ontology_path:str = "app/ontology/predicate_ontology.json"):
       """Utilizes the tools handed to it rather than creating them."""
       logger.info("Initializing Neural Divergent Cognitive Pipeline...")
       self.extractor = extractor
+      self.classifier = classifier
       self.importance_estimator = importance_estimator 
       self.decision_engine = decision_engine 
 
@@ -46,7 +48,7 @@ class NeuralDivergentOrchestrator:
       Master entry point.
       Ingests raw input, evaluates cognitive worth, routes to long term storage if appropriate.
       """
-      logger.info(f"Ingesting '{text}'") 
+      logger.info('Orchestrator is well and running.')
       results_ledger = [] 
 
       # Extracting SIRs
@@ -54,76 +56,72 @@ class NeuralDivergentOrchestrator:
       if not sirs:
           logger.info("No actionable semantic triples extracted.")
           return results_ledger
+      
+      # Caching classification results per message context to avoid repeating work
+      cached_category: MemoryCategory = None 
+      cached_event_type: str = None 
+      cached_confidence: float = None
        
        # Processing each extracted structural triple 
       for sir in sirs:
-         # Evaluating Importance Prior and Retention Policy
-         importance_score, retention_policy = self._evaluate(sir,active_contexts)
+         # looking up the configured properties of the predicate from the declerative ontology
+         predicate_config = self.ontology.get(sir.relationship.lower(),{})
 
-         # The Ephemeral Gate 
-         if retention_policy == RetentionPolicy.EPHEMERAL:
-            logger.info(f"Discarded as EPHEMERAL (Score: {importance_score}): [{sir.subject} -> {sir.relationship} -> {sir.object}]")
-            results_ledger.append({
-               "triple": (sir.subject,sir.relationship,sir.object),
-               "action":"IGNORED",
-               "reason":"Classified as Conversational Noise.",
-               "importance_prior":importance_score,
-               "retention_policy":retention_policy
-            })
-            continue 
-          
-         # Storing
-         result = self._store(sir,importance_score,retention_policy)
-         results_ledger.append(result) 
+         #Extracting category from ontology if it exists
+         ontology_category = predicate_config.get("category") 
+         ontology_event_type = predicate_config.get("graph_node_type") 
 
-      return results_ledger
-   
-   def _extract(self,text:str)->List[Any]:
-      """Delegates linguistic Parsing to the Extraction Engine."""
-      return self.extractor.extract_sirs(text) 
+         # Deterministic Firewall Gate 
+         if ontology_category and ontology_category.upper() in MemoryCategory.__members__:
+            # High-confidence match. Bypassing the zero-shot classifier completely
+            memory_category = MemoryCategory[ontology_category.upper()]
+            event_type = ontology_event_type or "Fact" 
+            classification_confidence = 1.0000
+            logger.info(f"Deterministic category hit via ontology for predicate '{sir.relationship}' : {memory_category}")
+         else:
+            if cached_category is None:
+               cached_category,cached_event_type,cached_confidence = self.classifier.resolve_ambiguity(text)
 
-   def _evaluate(self,sir:Any,active_contexts:List[str])->Tuple[float,str]:
-      """Delegates cognitive valuation to the Importance Estimator.""" 
-      return self.importance_estimator.evaluate_representation(sir,active_contexts) 
+            memory_category = cached_category 
+            event_type = cached_event_type 
+            classification_confidence = cached_confidence 
+            logger.info(f"Fallback invoked for predicate '{sir.relationship} : {memory_category}'") 
+         
+         # Inject evaluated categorical types directly into SIRs
+         sir.event_type = event_type
+         metadata_payload = sir.metadata.copy() if sir.metadata else {} 
+         metadata_payload["memory_category"] = memory_category.value
+         metadata_payload["classification_confidence"] = classification_confidence
 
-   def _store(self,sir:Any,importance_score:float,retention_policy:str) -> MemoryProcessingResult:
-      """Packages metadata and delegates conflict resolution to the Decision Engine."""
-      # Appending evaluation metrics to the metadata envelope
-      metadata_payload = sir.metadata.copy() if sir.metadata else {} 
-      metadata_payload["importance_prior"] = importance_score 
-      metadata_payload["retention_policy"] = retention_policy
+         # Computing mathemathically unified pipeline confidence 
+         sir.confidence = round((sir.confidence*0.6) + (classification_confidence * 0.4),4) 
 
-      # Looking up configured properties of the predicate from ontology registry
-      predicate_config = self.ontology.get(sir.relationship.lower(),{})
+         # Evaluating cognitive importance and retention 
+         importance_score,retention_policy=self.importance_estimator.evaluate_representation(sir,active_contexts) 
+         metadata_payload["importance_prior"] = importance_score 
+         metadata_payload["retention_policy"] = retention_policy 
 
-      # Looks up the configurations from predicate_ontology.json, defaulting if not found
-      event_type = (metadata_payload.get("event_type") or predicate_config.get("graph_node_type") or "SENSORY_NODE")
-      memory_category = (metadata_payload.get("memory_category") or predicate_config.get("category","GENERAL") or "GENERAL").upper()
+         if retention_policy == RetentionPolicy.EPHEREMAL:
+            results_ledger.append(MemoryProcessingResult(
+               subject=sir.subject,predicate=sir.relationship,object_val=sir.object,
+               action="IGNORED",importance_prior=importance_score,retention_policy="EPHEREMAL"
+            ))
+            continue
 
-      # updating the metadata payload
-      metadata_payload["event_type"] = event_type
-      metadata_payload["memory_category"] = memory_category
+         # Context Resolution and Storage via Decision Engine
+         action,memory_id = self.decision_engine.process_extracted_memory(
+            subject=sir.subject,
+            predicate=sir.relationship,
+            object_val=sir.object,
+            event_type=event_type,
+            memory_category=memory_category.value,
+            source_text=sir.source_text,
+            reason=sir.reason,
+            confidence=sir.confidence,
+            metadata=metadata_payload
+         )
 
-      action,memory_id = self.decision_engine.process_extracted_memory(
-         subject=sir.subject,
-         predicate=sir.relationship,
-         object_val=sir.object,
-         event_type=event_type,
-         memory_category=memory_category,
-         source_text=sir.source_text,
-         reason = sir.reason,
-         confidence=sir.confidence,
-         metadata=metadata_payload
-      )
-
-      logger.info(f"Storage Action: {action} (ID: {memory_id}) | Prior: {importance_score}")
-      
-      return MemoryProcessingResult(
-         subject=sir.subject,
-         predicate=sir.relationship,
-         object_val=sir.object,
-         action=action,
-         memory_id=memory_id,
-         importance_prior=importance_score,
-         retention_policy=retention_policy
-      )
+         results_ledger.append(MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
+                                                      action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy))
+         return results_ledger
+         

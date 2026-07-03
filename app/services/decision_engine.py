@@ -1,24 +1,24 @@
 from typing import Dict,Any,Tuple,Optional 
 from services.database import MemoryDatabase
+import logging
+
+logger = logging.getLogger(__name__)
 
 class MemoryDecisionEngine:
     """
     The cognitive orchestrator of Neural Divergent.
     Evaluates incoming semantic extractions against existing active memories.
     """
-    def __init__(self,db:MemoryDatabase):
+    def __init__(self,db:MemoryDatabase,registry:Dict[str,Dict[str,Any]]):
         self.db = db 
-        # Traits that represent exclusive characteristics (only one can be active at a time)
+        self.registry = registry
+        # Traits that represent exclusive characteristics (only one can be active at a time).
+        # Driven entirely by the "exclusive" flag in predicate_ontology.json
         self.single_value_predicates = {
-            "name", 
-            "age",
-            "favorite_language", 
-            "favorite_programming_language",
-            "primary_business",
-            "primary_category",
-            "birthday",
-            "nationality"
+            predicate_key for predicate_key,config in self.registry.items() 
+            if config.get("exclusive") is True
         }
+        logger.info(f"Decision Engine initialized.")
     
     def _handle_duplicate(self,subject:str,predicate:str,object_val:str) -> Optional[int]:
         """The Duplicate Check.

@@ -89,10 +89,10 @@ class MemoryDatabase:
             return [dict(row) for row in cursor.fetchall()]
         
     def insert_triple(self,subject:str,predicate:str,object_val:str,
-                      event_type:str,memory_category:str=None,
-                      source_text:str=None,reason:str=None,
+                      event_type:Optional[str]=None,memory_category:Optional[str]=None,
+                      source_text:Optional[str]=None,reason:Optional[str]=None,
                       confidence:float=1.0,metadata:Dict=None,
-                      supersedes_id: int = None)->int:
+                      supersedes_id: Optional[int] = None)->int:
         """Inserts a new semantic node/edge into the ledger with full metadata."""
 
         query = """
