@@ -1,6 +1,6 @@
 from transformers import pipeline
 from typing import Dict,Tuple
-from models.memory import SemanticRepresentation,MemoryCategory
+from app.models.memory import MemoryCategory
 
 class SemanticClassifier:
     def __init__(self):

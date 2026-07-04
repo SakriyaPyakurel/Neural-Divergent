@@ -2,11 +2,11 @@ from typing import List,Dict,Any,Tuple,Optional
 from dataclasses import dataclass
 import logging
 #Importing finalized cognitive modules
-from extractor import LocalExtractionEngine
-from semantic_classifier import SemanticClassifier
-from importance_engine import ImportanceEstimator,RetentionPolicy,OntologyLoader
-from decision_engine import MemoryDecisionEngine
-from models.memory import MemoryCategory
+from app.services.extractor import LocalExtractionEngine
+from app.services.semantic_classifier import SemanticClassifier
+from app.services.importance_engine import ImportanceEstimator,RetentionPolicy,OntologyLoader
+from app.services.decision_engine import MemoryDecisionEngine
+from app.models.memory import MemoryCategory
 
 logger = logging.getLogger('NeuralDivergent.Orchestrator')
 
@@ -21,6 +21,16 @@ class MemoryProcessingResult:
    importance_prior: float = 0.0 
    retention_policy: str = "EPHEMERAL"
    reason:Optional[str] = None
+
+   def to_dict(self) -> Dict[str, Any]:
+        """Converts the dataclass to the exact dictionary format the FastAPI router expects."""
+        return {
+            "triple": (self.subject, self.predicate, self.object_val),
+            "action": self.action,
+            "memory_id": self.memory_id,
+            "importance_prior": self.importance_prior,
+            "retention_policy": self.retention_policy
+        }
 
 class NeuralDivergentOrchestrator:
    """
@@ -43,7 +53,7 @@ class NeuralDivergentOrchestrator:
       self.ontology_path = ontology_path
       self.ontology = OntologyLoader.get_registry(ontology_path)
 
-   def ingest(self,text:str,active_contexts:List[str] = None) -> List[MemoryProcessingResult]:
+   def process_utterance(self,text:str,active_contexts:List[str] = None) -> List[MemoryProcessingResult]:
       """
       Master entry point.
       Ingests raw input, evaluates cognitive worth, routes to long term storage if appropriate.
@@ -52,7 +62,7 @@ class NeuralDivergentOrchestrator:
       results_ledger = [] 
 
       # Extracting SIRs
-      sirs = self._extract(text) 
+      sirs = self.extractor.extract_sirs(text) 
       if not sirs:
           logger.info("No actionable semantic triples extracted.")
           return results_ledger
@@ -101,11 +111,12 @@ class NeuralDivergentOrchestrator:
          metadata_payload["importance_prior"] = importance_score 
          metadata_payload["retention_policy"] = retention_policy 
 
-         if retention_policy == RetentionPolicy.EPHEREMAL:
-            results_ledger.append(MemoryProcessingResult(
+         if retention_policy == RetentionPolicy.EPHEMERAL:
+            result = MemoryProcessingResult(
                subject=sir.subject,predicate=sir.relationship,object_val=sir.object,
-               action="IGNORED",importance_prior=importance_score,retention_policy="EPHEREMAL"
-            ))
+               action="IGNORED",importance_prior=importance_score,retention_policy="EPHEMERAL"
+            )
+            results_ledger.append(result.to_dict())
             continue
 
          # Context Resolution and Storage via Decision Engine
@@ -121,7 +132,9 @@ class NeuralDivergentOrchestrator:
             metadata=metadata_payload
          )
 
-         results_ledger.append(MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
-                                                      action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy))
-         return results_ledger
+         result = MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
+                                                      action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy)
+         results_ledger.append(result.to_dict())
+         
+      return results_ledger
          

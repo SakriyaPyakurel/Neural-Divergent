@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Request,HTTPException,Query
 from typing import List,Dict,Any
-from models.schemas import IngestRequest,ProcessedTripleResponse,CognitiveIngestResponse
+from app.models.schemas import IngestRequest,ProcessedTripleResponse,CognitiveIngestResponse
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ async def ingest_conversation(request: Request,payload: IngestRequest):
     """
     orchestrator = request.app.state.orchestrator
     try:
-        results = orchestrator.ingest(
+        results = orchestrator.process_utterance(
             text=payload.text,
             active_contexts = payload.active_contexts
         )
