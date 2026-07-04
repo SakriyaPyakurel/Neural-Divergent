@@ -1,6 +1,6 @@
 import spacy
 from typing import List
-from models.memory import SemanticRepresentation,CandidateRelationship
+from app.models.memory import SemanticRepresentation,CandidateRelationship
 
 class LocalExtractionEngine:
     def __init__(self):
@@ -20,7 +20,7 @@ class LocalExtractionEngine:
         normalized_candidates = self.normalize_semantics(candidates) 
 
         # Passing normalized candidates to the builder
-        final_sirs = self.build_candidate_sirs(normalized_candidates)
+        final_sirs = self.build_candidate_sirs(candidates=normalized_candidates,original_text=raw_message)
 
         # Enriching metadata
         for sir in final_sirs:
@@ -191,7 +191,7 @@ class LocalExtractionEngine:
         return normalized
                   
 
-    def build_candidate_sirs(self,candidates:List[CandidateRelationship])->List[SemanticRepresentation]:
+    def build_candidate_sirs(self,candidates:List[CandidateRelationship],original_text:str)->List[SemanticRepresentation]:
         """Converting structured intermediate models into final SIRs"""
         sirs = [] 
         for candidate in candidates:
@@ -203,7 +203,7 @@ class LocalExtractionEngine:
                 subject = candidate.subject,
                 relationship=final_relationship,
                 object=candidate.object,
-                source_text=None, # will be filled in classify_event_type method
+                source_text=original_text, # will be filled in classify_event_type method
                 event_type=None, # will be decided later on by the classifier
                 reason=candidate.reason,
                 confidence = 0.0, # Placeholder, will be handled in the assign_confidence stage

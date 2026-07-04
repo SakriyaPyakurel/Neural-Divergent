@@ -3,7 +3,7 @@ from typing import Dict,Any,Tuple,Optional,List
 import os
 import json
 import logging 
-from models.memory import SemanticRepresentation
+from app.models.memory import SemanticRepresentation
 
 logger = logging.getLogger(__name__)
 
