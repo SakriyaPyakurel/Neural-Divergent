@@ -1,5 +1,6 @@
 import spacy
 from typing import List
+import re
 from app.models.memory import SemanticRepresentation,CandidateRelationship
 
 class LocalExtractionEngine:
@@ -9,6 +10,13 @@ class LocalExtractionEngine:
     
     def extract_sirs(self,raw_message:str) -> List[SemanticRepresentation]:
         """Main orchestation method for extraction"""
+        # casual input sanitization 
+        clean_message = re.sub(r'\b[iI]\b', 'I', raw_message)
+
+        #Capitalizing the first letter of the sentence to anchor the dependency root.
+        if clean_message:
+            clean_message = clean_message[0].upper() + clean_message[1:]
+            raw_message = clean_message
         doc,reason_text,exclude_ids = self.parse_message(raw_message) 
 
         candidates : List[CandidateRelationship] = []
@@ -92,7 +100,7 @@ class LocalExtractionEngine:
                continue
 
             # looking for action verbs
-            if token.pos_ == "VERB" and token.lemma_ != "be":
+            if (token.pos_ == "VERB" or token.dep_ == "ROOT") and token.lemma_ != "be":
                 # Skip infinitive modifier verbs
                 if any(c.text.lower() == "to" and c.dep_ == "aux" for c in token.children):
                     continue
@@ -126,7 +134,8 @@ class LocalExtractionEngine:
                     if child.i in exclude_ids:
                         continue
                     # Capturing direct objects, prepositional phases along with clausal complements
-                    if child.dep_ in ["dobj", "pobj", "prep", "oprd", "ccomp"]:
+                    valid_deps = ["dobj", "pobj", "prep", "oprd", "ccomp", "xcomp", "acomp", "attr", "npadvmod"]
+                    if child.dep_ in valid_deps:
                         component_text = " ".join([t.text for t in child.subtree if t.i not in exclude_ids])
                         if component_text:
                             obj_components.append(component_text)
