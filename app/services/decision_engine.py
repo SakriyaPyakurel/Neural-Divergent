@@ -20,7 +20,7 @@ class MemoryDecisionEngine:
         }
         logger.info(f"Decision Engine initialized.")
     
-    def _handle_duplicate(self,subject:str,predicate:str,object_val:str) -> Optional[int]:
+    def _handle_duplicate(self,subject:str,predicate:str,object_val:str,new_source_text:str) -> Optional[int]:
         """The Duplicate Check.
         Checks if the exact fact [Subject -> Predicate -> Object] is already actively known.
         
@@ -32,7 +32,7 @@ class MemoryDecisionEngine:
 
         if duplicate_record:
             # "touch" it to update the last_accessed timestamp, proving it is still relevant
-            self.db.touch_memory(duplicate_record['id']) 
+            self.db.touch_memory(duplicate_record['id'],new_source_text) 
             return duplicate_record['id']
         return None
 
@@ -121,7 +121,7 @@ class MemoryDecisionEngine:
         obj_clean = object_val.strip() 
 
         # Duplicate Check
-        dup_id = self._handle_duplicate(subj_clean,pred_clean,obj_clean) 
+        dup_id = self._handle_duplicate(subj_clean,pred_clean,obj_clean,source_text) 
         if dup_id is not None:
             return "DUPLICATE",dup_id 
         

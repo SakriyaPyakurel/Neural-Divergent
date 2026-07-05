@@ -120,6 +120,17 @@
     "graph_node_type": "INTEREST",
     "description": "General personal affinity toward an item or concept."
   },
+  "love": {
+    "category": "preference",
+    "importance": "MEDIUM",
+    "retention": "LONG_TERM",
+    "exclusive": false,
+    "allow_multiple": true,
+    "supports_negation": true,
+    "supports_reason": true,
+    "graph_node_type": "INTEREST",
+    "description": "General personal affinity toward an item or concept."
+  },
   "hate": {
     "category": "preference",
     "importance": "MEDIUM",

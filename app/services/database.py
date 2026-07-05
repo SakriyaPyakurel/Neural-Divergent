@@ -111,6 +111,22 @@ class MemoryDatabase:
             conn.commit() 
             return cursor.lastrowid
     
+    def reinforce_memory(self,memory_id:int,new_source_text:str):
+        """Updates the source text and bumps the last_accessed timestamp for an existing memory."""
+
+        query = """
+        UPDATE memories 
+        SET source_text = ?, 
+            last_accessed = CURRENT_TIMESTAMP
+        WHERE id = ?
+        """
+
+        # Executing and committing the transaction
+        with self._get_connection() as conn:
+            cursor = conn.cursor() 
+            cursor.execute(query,(new_source_text,memory_id)) 
+            conn.commit()          
+    
     def deprecate_memory(self,memory_id:int):
         """Soft deletes a memory(sets is_active to 0)""" 
 
@@ -120,10 +136,10 @@ class MemoryDatabase:
             cursor.execute(query,(memory_id,)) 
             conn.commit()
     
-    def touch_memory(self,memory_id:int):
+    def touch_memory(self,memory_id:int,new_source_text:str):
         """Updates the access heartbeat when a memory is accessed or confirmed."""
-        query = "UPDATE semantic_memories SET last_accessed = CURRENT_TIMESTAMP WHERE id = ?"
+        query = "UPDATE semantic_memories SET source_text=?,last_accessed = CURRENT_TIMESTAMP WHERE id = ?"
         with self._get_connection() as conn:
             cursor = conn.cursor() 
-            cursor.execute(query,(memory_id,)) 
+            cursor.execute(query,(new_source_text,memory_id)) 
             conn.commit()
