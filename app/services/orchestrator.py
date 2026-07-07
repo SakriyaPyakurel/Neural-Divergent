@@ -21,15 +21,22 @@ class MemoryProcessingResult:
    importance_prior: float = 0.0 
    retention_policy: str = "EPHEMERAL"
    reason:Optional[str] = None
+   confidence: float = 1.0
 
    def to_dict(self) -> Dict[str, Any]:
         """Converts the dataclass to the exact dictionary format the FastAPI router expects."""
         return {
-            "triple": (self.subject, self.predicate, self.object_val),
+            "triple": {
+                "subject": self.subject,
+                "predicate": self.predicate,
+                "object": self.object_val
+            },
             "action": self.action,
             "memory_id": self.memory_id,
             "importance_prior": self.importance_prior,
-            "retention_policy": self.retention_policy
+            "retention_policy": self.retention_policy,
+            "reason":self.reason,
+            "confidence":self.confidence
         }
 
 class NeuralDivergentOrchestrator:
@@ -133,7 +140,8 @@ class NeuralDivergentOrchestrator:
          )
 
          result = MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
-                                                      action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy)
+                                                      action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy,
+                                                      reason=sir.reason,confidence=sir.confidence)
          results_ledger.append(result.to_dict())
          
       return results_ledger

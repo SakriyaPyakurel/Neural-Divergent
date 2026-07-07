@@ -1,6 +1,7 @@
 from typing import Dict,Any,Tuple,Optional 
 from app.services.database import MemoryDatabase
 import logging
+from datetime import datetime,timezone,timedelta
 
 logger = logging.getLogger(__name__)
 
@@ -20,21 +21,37 @@ class MemoryDecisionEngine:
         }
         logger.info(f"Decision Engine initialized.")
     
-    def _handle_duplicate(self,subject:str,predicate:str,object_val:str,new_source_text:str) -> Optional[int]:
-        """The Duplicate Check.
+    def _handle_duplicate(self,subject:str,predicate:str,object_val:str,new_source_text:str) -> Tuple[Optional[str],Optional[int]]:
+        """The Debounce & Reinforcement Check.
         Checks if the exact fact [Subject -> Predicate -> Object] is already actively known.
         
         Returns:
         The memory ID if it's a duplicate (after updating its heartbeat)
-        or None if the fact is new or different""" 
+        or (None,None) if the fact is new or different""" 
         # Search the database for an exact active match.
         duplicate_record = self.db.find_exact_triple(subject,predicate,object_val) 
 
         if duplicate_record:
-            # "touch" it to update the last_accessed timestamp, proving it is still relevant
+            last_accessed_str = duplicate_record.get('last_accessed') 
+            if last_accessed_str:
+                try:
+                  # Parsing SQLite's CURRENT_TIMESTAMP format ("YYYY-MM-DD HH:MM:SS")
+                  last_accessed_nv = datetime.strptime(last_accessed_str,"%Y-%m-%d %H:%M:%S")
+                  last_accessed_aware = last_accessed_nv.replace(tzinfo=timezone.utc)
+                  time_since_access = datetime.now(timezone.utc) - last_accessed_aware
+
+                  # debounce threshold is 1 hour
+                  if time_since_access < timedelta(hours=1):
+                    logger.info(f"Memory {duplicate_record['id']} throttled (DUPLICATE). Mentioned too recently.")
+                    return "DUPLICATE", duplicate_record['id']
+                except ValueError as e:
+                    logger.warning(f"Could not parse timestamp '{last_accessed_str}' for memory {duplicate_record['id']}: {e}")
+            # If passing the threshold (or if parsing is failed) -> Reinforce
             self.db.touch_memory(duplicate_record['id'],new_source_text) 
-            return duplicate_record['id']
-        return None
+            logger.info(f"Memory {duplicate_record['id']} REINFORCED after temporal gap.")
+            return "REINFORCED",duplicate_record['id']
+
+        return None,None
 
     def _handle_contradiction(self,subject:str,predicate:str,object_val:str,
                               event_type:str=None,memory_category:str=None,
@@ -120,10 +137,10 @@ class MemoryDecisionEngine:
         pred_clean = predicate.strip().lower() 
         obj_clean = object_val.strip() 
 
-        # Duplicate Check
-        dup_id = self._handle_duplicate(subj_clean,pred_clean,obj_clean,source_text) 
-        if dup_id is not None:
-            return "DUPLICATE",dup_id 
+        # Duplicate / Reinforcement Check
+        action,matched_id = self._handle_duplicate(subj_clean,pred_clean,obj_clean,source_text) 
+        if action is not None:
+            return action,matched_id
         
         # Contradiction/Overwrite Check
         superseded_id = self._handle_contradiction(
