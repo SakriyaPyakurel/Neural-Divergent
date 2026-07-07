@@ -1,6 +1,7 @@
 from fastapi import APIRouter,Request,HTTPException,Query
 from typing import List,Dict,Any
-from app.models.schemas import IngestRequest,ProcessedTripleResponse,CognitiveIngestResponse
+from app.models.schemas import IngestRequest,CognitiveIngestResponse
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -10,33 +11,41 @@ memory_router = APIRouter(
     tags = ["Cognitive Memory Engine"] 
 )
 
-@memory_router.post("/ingest",response_model=CognitiveIngestResponse)
-async def ingest_conversation(request: Request,payload: IngestRequest):
+@memory_router.post("/ingest", response_model=CognitiveIngestResponse)
+async def ingest_information(
+    payload: IngestRequest,
+    request: Request  # Injecting the raw request to access app.state
+):
     """
-    Ingest a raw conversational utterance
+    Ingests natural language, extracts semantic triples, evaluates importance, 
+    and commits valuable data to the memory graph.
     """
+    # Retrieving the pre-loaded orchestrator from the application state
     orchestrator = request.app.state.orchestrator
+    
     try:
-        results = orchestrator.process_utterance(
+        # Running the pipeline
+        raw_ledger = orchestrator.process_utterance(
             text=payload.text,
-            active_contexts = payload.active_contexts
+            active_contexts=payload.active_contexts
         )
+        
+        # Calculating high-level metrics for the API response
+        stored = sum(1 for item in raw_ledger if item["action"] in ["NEW", "REINFORCED", "SUPERSEDED"])
+        ignored = sum(1 for item in raw_ledger if item["action"] == "IGNORED")
+
+        # Packagaging the raw dictionary results into the Pydantic schema
         return CognitiveIngestResponse(
-            utterance=payload.text,
-            processed_count=len(results),
-            results=[
-                ProcessedTripleResponse(
-                    triple=list(r["triple"]),
-                    action=r["action"],
-                    memory_id=r.get("memory_id"),
-                    importance_prior=r["importance_prior"],
-                    retention_policy=r["retention_policy"] 
-                    ) for r in results  
-            ]
+            source_text=payload.text,
+            processed_count=len(raw_ledger),
+            stored_count=stored,
+            ignored_count=ignored,
+            results=raw_ledger 
         )
+
     except Exception as e:
-        logger.error(f"Ingestion Failed: {str(e)}")
-        raise HTTPException(status_code=500,detail=f"Error in pipeline: {str(e)}")
+        logger.error(f"Pipeline crashed during ingestion: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="The cognitive pipeline encountered an internal error.")
         
 
 @memory_router.get("/active",response_model=List[Dict[str,Any]])
