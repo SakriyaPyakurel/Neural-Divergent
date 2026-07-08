@@ -1,6 +1,5 @@
 import sqlite3 
 import json 
-from datetime import datetime 
 from typing import List,Dict,Optional,Any
 
 class MemoryDatabase:
@@ -25,9 +24,11 @@ class MemoryDatabase:
             object TEXT NOT NULL,
             event_type TEXT,                -- Made NULLABLE to prevent extraction integrity issues
             memory_category TEXT,           -- IDENTITY, PREFERENCE, KNOWLEDGE, etc.
-            source_text TEXT,               -- The raw sentence that triggered this extraction (Problem 3)
+            source_text TEXT,               -- The raw sentence that triggered this extraction 
             reason TEXT,
-            confidence REAL,
+            confidence REAL DEFAULT 1.0,
+            importance_score REAL DEFAULT 1.0,
+            strength INTEGER DEFAULT 1,    -- DEFAULTS to 1
             metadata TEXT,                  -- Stored as a JSON string
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -89,7 +90,7 @@ class MemoryDatabase:
             return [dict(row) for row in cursor.fetchall()]
         
     def insert_triple(self,subject:str,predicate:str,object_val:str,
-                      event_type:Optional[str]=None,memory_category:Optional[str]=None,
+                      importance_score:float,event_type:Optional[str]=None,memory_category:Optional[str]=None,
                       source_text:Optional[str]=None,reason:Optional[str]=None,
                       confidence:float=1.0,metadata:Dict=None,
                       supersedes_id: Optional[int] = None)->int:
@@ -97,15 +98,15 @@ class MemoryDatabase:
 
         query = """
          INSERT INTO semantic_memories 
-        (subject, predicate, object, event_type, memory_category, source_text, reason, confidence, metadata, supersedes_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (subject, predicate, object, importance_score, event_type, memory_category, source_text, reason, confidence, metadata, supersedes_id)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         meta_str = json.dumps(metadata) if metadata else "{}" 
 
         with self._get_connection() as conn:
             cursor= conn.cursor() 
             cursor.execute(query,(
-                subject, predicate, object_val, event_type, 
+                subject, predicate, object_val, importance_score, event_type, 
                 memory_category, source_text, reason, confidence, meta_str, supersedes_id
             ))
             conn.commit() 
@@ -138,7 +139,11 @@ class MemoryDatabase:
     
     def touch_memory(self,memory_id:int,new_source_text:str):
         """Updates the access heartbeat when a memory is accessed or confirmed."""
-        query = "UPDATE semantic_memories SET source_text=?,last_accessed = CURRENT_TIMESTAMP WHERE id = ?"
+        query = """UPDATE semantic_memories SET source_text=?,
+                last_accessed = CURRENT_TIMESTAMP,
+                strength = strength+1,
+                importance_score = MIN(1.0, importance_score+0.05) 
+                WHERE id = ?"""
         with self._get_connection() as conn:
             cursor = conn.cursor() 
             cursor.execute(query,(new_source_text,memory_id)) 
