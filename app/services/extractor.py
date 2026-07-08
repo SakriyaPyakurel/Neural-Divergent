@@ -212,7 +212,7 @@ class LocalExtractionEngine:
                 subject = candidate.subject,
                 relationship=final_relationship,
                 object=candidate.object,
-                source_text=original_text, # will be filled in classify_event_type method
+                source_text=original_text,
                 event_type=None, # will be decided later on by the classifier
                 reason=candidate.reason,
                 confidence = 0.0, # Placeholder, will be handled in the assign_confidence stage

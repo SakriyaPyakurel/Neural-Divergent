@@ -1,4 +1,4 @@
-from typing import List,Dict,Any,Tuple,Optional
+from typing import List,Dict,Any,Optional
 from dataclasses import dataclass
 import logging
 #Importing finalized cognitive modules
@@ -107,7 +107,6 @@ class NeuralDivergentOrchestrator:
          # Inject evaluated categorical types directly into SIRs
          sir.event_type = event_type
          metadata_payload = sir.metadata.copy() if sir.metadata else {} 
-         metadata_payload["memory_category"] = memory_category.value
          metadata_payload["classification_confidence"] = classification_confidence
 
          # Computing mathemathically unified pipeline confidence 
@@ -131,6 +130,7 @@ class NeuralDivergentOrchestrator:
             subject=sir.subject,
             predicate=sir.relationship,
             object_val=sir.object,
+            importance_score=importance_score,
             event_type=event_type,
             memory_category=memory_category.value,
             source_text=sir.source_text,

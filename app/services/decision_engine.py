@@ -54,7 +54,7 @@ class MemoryDecisionEngine:
         return None,None
 
     def _handle_contradiction(self,subject:str,predicate:str,object_val:str,
-                              event_type:str=None,memory_category:str=None,
+                              importance_score:float,event_type:str=None,memory_category:str=None,
                               source_text:str=None,reason:str=None,
                               confidence:float=1.0,metadata:Dict = None) -> Optional[int]:
         """Contradiction Check
@@ -84,6 +84,7 @@ class MemoryDecisionEngine:
                 subject=subject,
                 predicate=predicate,
                 object_val=object_val,
+                importance_score=importance_score,
                 event_type=event_type,
                 memory_category=memory_category,
                 source_text=source_text,
@@ -98,7 +99,7 @@ class MemoryDecisionEngine:
         return None
     
     def _handle_novel(self,subject:str,predicate:str,object_val:str,
-                      event_type:str=None,memory_category:str = None,
+                      importance_score:float,event_type:str=None,memory_category:str = None,
                       source_text:str=None,reason:str=None,
                       confidence:float=1.0,metadata:dict=None) -> int:
         """Novel entry
@@ -111,6 +112,7 @@ class MemoryDecisionEngine:
             subject=subject,
             predicate=predicate,
             object_val=object_val,
+            importance_score=importance_score,
             event_type=event_type,
             memory_category=memory_category,
             source_text=source_text,
@@ -120,7 +122,7 @@ class MemoryDecisionEngine:
         )
     
     def process_extracted_memory(self,subject:str,predicate:str,object_val:str,
-                                 event_type:str=None,memory_category:str=None,
+                                 importance_score:float,event_type:str=None,memory_category:str=None,
                                  source_text:str=None,reason:str=None,
                                  confidence:float=1.0,metadata:Dict=None) -> Tuple[str,int]:
         """
@@ -147,6 +149,7 @@ class MemoryDecisionEngine:
             subject=subj_clean,
             predicate=pred_clean,
             object_val=obj_clean,
+            importance_score=importance_score,
             event_type=event_type,
             memory_category=memory_category,
             source_text=source_text,
@@ -162,6 +165,7 @@ class MemoryDecisionEngine:
             subject=subj_clean,
             predicate=pred_clean,
             object_val=obj_clean,
+            importance_score=importance_score,
             event_type=event_type,
             memory_category=memory_category,
             source_text=source_text,
