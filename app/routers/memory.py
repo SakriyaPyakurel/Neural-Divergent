@@ -73,3 +73,32 @@ async def get_related_memories(request:Request, subject:str):
         return records 
     except Exception as e:
         raise HTTPException(status_code=500,detail=str(e))
+    
+@memory_router.get("/search")
+async def search_cognitive_memory(
+    request:Request,
+    q:str=Query(...,description="The concept,entity or keyword to search."),
+    limit:int = Query(10,description="Maximum number of memories to retrieve.")
+):
+    """
+    Query the cognitive memory graph. Returns a ranked list of relevant
+    memories balancing importance,confidence,reinforcement strength and recency.
+    """
+    if not q.strip():
+        raise HTTPException(status_code=400,detail="Search query cannot be empty.") 
+    
+    # Grabbing the database connection from application state 
+    db = request.app.state.db 
+
+    try:
+        # Executing the ranked memory search
+        results = db.search_ranked_memories(search_term=q,limit=limit) 
+
+        return {
+            "query":q,
+            "total_found":len(results),
+            "results":results
+        }
+    except Exception as e:
+        logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
+        raise HTTPException(status_code=500,detail="Internal Search error.")

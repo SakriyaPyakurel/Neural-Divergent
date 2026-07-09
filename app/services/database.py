@@ -1,6 +1,7 @@
 import sqlite3 
 import json 
-from typing import List,Dict,Optional,Any
+from typing import List,Dict,Optional
+import logging
 
 class MemoryDatabase:
     def __init__(self,db_path:str="neural_divergent.db"):
@@ -148,3 +149,33 @@ class MemoryDatabase:
             cursor = conn.cursor() 
             cursor.execute(query,(new_source_text,memory_id)) 
             conn.commit()
+
+    def search_ranked_memories(self,search_term:str,limit:int=10)->list[dict]:
+        """
+        Search active memories using full text keyword match across subject,
+        predicate, and object, ranking the results via unified cognitive scoring formula.
+        """
+        query = """
+            SELECT *,
+            -- The cognitive ranking formula --
+            (importance_score * confidence * MIN(3.0,1.0+(strength-1.0)*0.2))/
+            (1.0+(julianday('now)-julianday(last_accessed))*0.05) AS cognitive_rank
+            FROM memories
+            WHERE is_active = 1
+            AND (subject LIKE ? OR predicate LIKE ? OR object LIKE ?)
+            ORDER BY cognitive_rank DESC
+            LIMIT ?
+        """
+        like_term = f"%{search_term.strip()}%"
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query,(like_term,like_term,like_term,limit))
+                columns = [column[0] for column in cursor.description]
+                results = [dict(zip(columns,row)) for row in cursor.fetchall()]
+            for res in results:
+                res['cognitive_rank'] = round(res['cognitive_rank'],4)
+            return results
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Search failed: {e}") 
+            return []
