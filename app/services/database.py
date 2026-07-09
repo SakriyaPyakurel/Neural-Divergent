@@ -1,6 +1,6 @@
 import sqlite3 
 import json 
-from typing import List,Dict,Optional
+from typing import List,Dict,Optional,Any
 import logging
 
 class MemoryDatabase:
@@ -143,7 +143,9 @@ class MemoryDatabase:
         query = """UPDATE semantic_memories SET source_text=?,
                 last_accessed = CURRENT_TIMESTAMP,
                 strength = strength+1,
-                importance_score = MIN(1.0, importance_score+0.05) 
+                importance_score = MIN(1.0, importance_score+0.05),
+                -- Confidence Evolution: Closing 20 percent of the remaining gap to 1.0 (Asympotic Growth)--
+                confidence = MIN(1.0, confidence + (1.0 - confidence) * 0.2)
                 WHERE id = ?"""
         with self._get_connection() as conn:
             cursor = conn.cursor() 
@@ -159,8 +161,8 @@ class MemoryDatabase:
             SELECT *,
             -- The cognitive ranking formula --
             (importance_score * confidence * MIN(3.0,1.0+(strength-1.0)*0.2))/
-            (1.0+(julianday('now)-julianday(last_accessed))*0.05) AS cognitive_rank
-            FROM memories
+            (1.0+(julianday('now')-julianday(last_accessed))*0.05) AS cognitive_rank
+            FROM semantic_memories
             WHERE is_active = 1
             AND (subject LIKE ? OR predicate LIKE ? OR object LIKE ?)
             ORDER BY cognitive_rank DESC
@@ -179,3 +181,35 @@ class MemoryDatabase:
         except Exception as e:
             logging.getLogger(__name__).error(f"Search failed: {e}") 
             return []
+        
+    def get_decayable_memories(self)->List[Dict[str,Any]]:
+        """
+        Returns active EPHEMERAL or SHORT_TERM memories with their
+        dynamically calculated cognitive rank to evaluate for archival.
+        """
+        query="""
+               SELECT *,
+               (importance_score * confidence * MIN(3.0,1.0 + (strength - 1.0) * 0.2)) /
+               (1.0 + (julianday('now') - julianday(last_accessed)) * 0.05) AS current_rank
+               FROM semantic_memories
+               WHERE is_active=1
+               AND json_extract(metadata,'$.retention_policy') IN ('EPHEMERAL','SHORT_TERM')
+        """
+        with self._get_connection() as conn:
+            cursor = conn.cursor() 
+            cursor.execute(query) 
+            columns = [column[0] for column in cursor.description] 
+            results = [dict(zip(columns,row)) for row in cursor.fetchall()] 
+        return results
+    
+    def archive_faded_memories(self,ids_to_archive:List[int]):
+        """Bulk archives memories by turning off their respective active flag""" 
+        if not ids_to_archive:
+            return 
+        placeholders = ','.join('?' for _ in ids_to_archive) 
+        query = f"UPDATE semantic_memories SET is_active = 0 WHERE id IN ({placeholders})" 
+        with self._get_connection() as conn:
+            cursor = conn.cursor() 
+            cursor.execute(query,ids_to_archive) 
+            conn.commit() 
+        logging.getLogger(__name__).info(f"Archived {len(ids_to_archive)} decayed memories from active state.")
