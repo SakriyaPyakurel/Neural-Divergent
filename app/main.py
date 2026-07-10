@@ -9,6 +9,7 @@ from app.services.decision_engine import MemoryDecisionEngine
 from app.services.extractor import LocalExtractionEngine 
 from app.services.semantic_classifier import SemanticClassifier
 from app.services.orchestrator import NeuralDivergentOrchestrator 
+from app.services.decay_engine import CognitiveDecayEngine
 
 # importing routers
 from app.routers.memory import memory_router
@@ -42,9 +43,16 @@ async def lifespan(app:FastAPI):
     )
     app.state.orchestrator = orchestrator
 
-    logger.info("Cognitive services initialized and attached to state.")
+    # Spawning the Cognitive Decay Engine
+    # Checking every hour(3600s), archiving if rank drops below 0.12
+    decay_engine = CognitiveDecayEngine(db=db,check_interval_seconds=3600,decay_threshold=0.12)
+    app.state.decay_engine = decay_engine
+    
+    logger.info("Cognitive services and Decay Scheduler initialized..")
     yield 
     logger.info("Shutting down Neural Divergent. Flushing down transient memory...")
+    # Stopping background tasks gracefully before complete shutdown.
+    await decay_engine.stop()
 
 app = FastAPI(title="Neural-Divergent API",
               description="The Cognitive orchestrator and memory decision engine.",

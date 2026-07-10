@@ -10,7 +10,7 @@ class MemoryDatabase:
     
     def _get_connection(self):
         """Creates and returns a database connection for Neural Divergent."""
-        conn = sqlite3.connect(self.db_path) 
+        conn = sqlite3.connect(self.db_path,check_same_thread=False) 
         conn.row_factory = sqlite3.Row # Returning rows as dictionaries instead of just raw tuples
         return conn
     
