@@ -4,7 +4,7 @@ from app.models.schemas import IngestRequest,CognitiveIngestResponse
 
 import logging
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('NeuralDivergent.memory_router')
 
 memory_router = APIRouter(
     prefix="/api/v1/memory",
@@ -102,3 +102,31 @@ async def search_cognitive_memory(
     except Exception as e:
         logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
         raise HTTPException(status_code=500,detail="Internal Search error.")
+    
+@memory_router.get("/traverse") 
+async def traverse_graph(
+    request:Request,
+    entity:str = Query(...,description="The root entity to start the traversal from (e.g. 'User' or 'Python')"),
+    limit:int = Query(15,description="Maximum number of nodes to return in the web.") 
+):
+    """
+    Performs an associative cognitive graph traversal.
+    Returns direct matches (Depth 0) and related associative memories (Depth 1) 
+    ranked by human-like cognitive priority
+    """
+    if not entity.strip():
+        raise HTTPException(status_code=400,detail="Root entity cannot be empty.") 
+    
+    db = request.app.state.db 
+
+    try:
+        results = db.traverse_memory_graph(root_entity=entity,limit=limit) 
+
+        return {
+            "root_entity":entity,
+            "total_nodes":len(results),
+            "graph":results
+        }
+    except Exception as e:
+        logger.error(f"Failed to traverse graph: {str(e)}",exc_info=True) 
+        raise HTTPException(status_code=500,detail="Memory Traversal Error.")

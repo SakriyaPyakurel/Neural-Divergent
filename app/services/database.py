@@ -181,7 +181,64 @@ class MemoryDatabase:
         except Exception as e:
             logging.getLogger(__name__).error(f"Search failed: {e}") 
             return []
-        
+    
+    def traverse_memory_graph(self,root_entity:str,limit:int=15) -> List[Dict[str,Any]]:
+        """
+        Performs a 1-degree graph traversal from a root entity.
+        Returns direct matches(depth 0) and related cognitive memories(depth 1),
+        ranked by cognitive strength
+        """
+        query = """
+              WITH direct_matches AS (
+                -- Depth 0: Exact or partial matches to the root entity
+                SELECT id, subject, object
+                FROM semantic_memories
+                WHERE is_active = 1 
+                  AND (subject LIKE ? OR object LIKE ?)
+                ORDER BY importance_score DESC
+                LIMIT 5 -- Bounding the start nodes so the graph doesn't explode
+            ),
+            connected_memories AS (
+                -- Fetch the full rows for Depth 0 Nodes
+                SELECT m.*, 0 AS traversal_depth
+                FROM semantic_memories m
+                JOIN direct_matches d ON m.id = d.id
+                
+                UNION
+                
+                -- Depth 1: Associative Nodes connected to Depth 0
+                -- (e.g., sharing the same subject or object)
+                SELECT m.*, 1 AS traversal_depth
+                FROM semantic_memories m
+                JOIN direct_matches d 
+                  ON (m.subject = d.subject OR m.object = d.subject OR m.subject = d.object OR m.object = d.object)
+                WHERE m.is_active = 1 AND m.id != d.id
+            )
+            SELECT *,
+                -- Calculate Cognitive Rank for the entire associative web
+                (importance_score * confidence * MIN(3.0, 1.0 + (strength - 1.0) * 0.2)) / 
+                (1.0 + (julianday('now') - julianday(last_accessed)) * 0.05) AS cognitive_rank
+            FROM connected_memories
+            GROUP BY id  -- Deduplicate if a memory was reached via multiple associative paths
+            ORDER BY traversal_depth ASC, cognitive_rank DESC
+            LIMIT ?
+            """
+        like_term = f"%{root_entity.strip()}%"
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor() 
+                cursor.execute(query,(like_term,like_term,limit)) 
+                columns = [column[0] for column in cursor.description] 
+                results = [dict(zip(columns,row)) for row in cursor.fetchall()] 
+
+                for res in results:
+                    res['cognitive_rank'] = round(res['cognitive_rank'],4) 
+                
+                return results 
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Graph traversal failed: {e}")
+            return []
+
     def get_decayable_memories(self)->List[Dict[str,Any]]:
         """
         Returns active EPHEMERAL or SHORT_TERM memories with their
