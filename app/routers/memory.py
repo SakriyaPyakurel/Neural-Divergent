@@ -81,19 +81,24 @@ async def search_cognitive_memory(
     limit:int = Query(10,description="Maximum number of memories to retrieve.")
 ):
     """
-    Query the cognitive memory graph. Returns a ranked list of relevant
-    memories balancing importance,confidence,reinforcement strength and recency.
+    Query the cognitive memory graph using Hybrid Vector Search (Neural Divergent - 5)
     """
     if not q.strip():
         raise HTTPException(status_code=400,detail="Search query cannot be empty.") 
     
-    # Grabbing the database connection from application state 
+    # Grabbing the database connection and embedder from application state 
     db = request.app.state.db 
-
+    embedder = request.app.state.embedder
     try:
-        # Executing the ranked memory search
-        results = db.search_ranked_memories(search_term=q,limit=limit) 
+        # Instantly converting the user's query into a 384-dimensional vector instantly
+        query_vector = embedder.generate_embeddings(q)
 
+        # Executing the hybrid search 
+        results = db.search_hybrid_memories(
+            search_term=q,
+            query_embedding=query_vector,
+            limit=limit
+        )
         return {
             "query":q,
             "total_found":len(results),

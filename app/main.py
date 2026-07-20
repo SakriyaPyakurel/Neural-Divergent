@@ -10,6 +10,7 @@ from app.services.extractor import LocalExtractionEngine
 from app.services.semantic_classifier import SemanticClassifier
 from app.services.orchestrator import NeuralDivergentOrchestrator 
 from app.services.decay_engine import CognitiveDecayEngine
+from app.services.embedding_engine import EmbeddingEngine
 
 # importing routers
 from app.routers.memory import memory_router
@@ -33,14 +34,17 @@ async def lifespan(app:FastAPI):
     decision_engine = MemoryDecisionEngine(db=db,registry=registry) 
     extractor = LocalExtractionEngine()
     classifier = SemanticClassifier()
+    embedder = EmbeddingEngine()
 
     # Initializing the orchestrator and attach to state (needed for ingestion) 
     orchestrator = NeuralDivergentOrchestrator(
         extractor=extractor,
         classifier=classifier,
         importance_estimator=importance_estimator,
-        decision_engine=decision_engine
+        decision_engine=decision_engine,
+        embedder=embedder
     )
+    app.state.embedder = embedder
     app.state.orchestrator = orchestrator
 
     # Spawning the Cognitive Decay Engine
