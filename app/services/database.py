@@ -1,17 +1,23 @@
 import sqlite3 
 import json 
 from typing import List,Dict,Optional,Any
+import sqlite_vec
 import logging
 
 class MemoryDatabase:
     def __init__(self,db_path:str="neural_divergent.db"):
         self.db_path = db_path 
         self.setup_tables() 
+
     
     def _get_connection(self):
         """Creates and returns a database connection for Neural Divergent."""
         conn = sqlite3.connect(self.db_path,check_same_thread=False) 
         conn.row_factory = sqlite3.Row # Returning rows as dictionaries instead of just raw tuples
+
+        # Injecting the vector engine into the connection 
+        conn.enable_load_extension(True) 
+        sqlite_vec.load(conn) 
         return conn
     
     def setup_tables(self):
@@ -46,12 +52,21 @@ class MemoryDatabase:
         CREATE INDEX IF NOT EXISTS idx_subject ON semantic_memories(subject);
         """
 
+        # Adding Vector Table Schema
+        query_vectors = """
+        CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
+        embedding float[384]
+    );
+    """
         with self._get_connection() as conn:
             cursor = conn.cursor() 
             cursor.execute(query) 
             cursor.execute(index_triples) 
-            cursor.execute(index_subject)
+            cursor.execute(index_subject) 
+            # Initializing the vector table
+            cursor.execute(query_vectors) 
             conn.commit()
+
 
     def find_exact_triple(self,subject:str,predicate:str,object_val:str) -> Optional[Dict]:
         """Checks if a specific, exact memory already is in existence to prevent duplicate entries."""
@@ -94,7 +109,8 @@ class MemoryDatabase:
                       importance_score:float,event_type:Optional[str]=None,memory_category:Optional[str]=None,
                       source_text:Optional[str]=None,reason:Optional[str]=None,
                       confidence:float=1.0,metadata:Dict=None,
-                      supersedes_id: Optional[int] = None)->int:
+                      supersedes_id: Optional[int] = None,
+                      vector_embedding:Optional[List[float]]=None)->int:
         """Inserts a new semantic node/edge into the ledger with full metadata."""
 
         query = """
@@ -105,15 +121,24 @@ class MemoryDatabase:
         meta_str = json.dumps(metadata) if metadata else "{}" 
 
         with self._get_connection() as conn:
-            cursor= conn.cursor() 
+            cursor= conn.cursor()
+            # Inserting the deterministic proto-graph memory 
             cursor.execute(query,(
                 subject, predicate, object_val, importance_score, event_type, 
                 memory_category, source_text, reason, confidence, meta_str, supersedes_id
             ))
+            # grabbing the newly generated ID
+            new_memory_id = cursor.lastrowid
+
+            # Inserting the vector using the same ID for locking them together
+            if vector_embedding:
+                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
+                cursor.execute("INSERT INTO memory_vectors(rowid,embedding) VALUES (?,?)",
+                (new_memory_id,vector_bytes))
             conn.commit() 
-            return cursor.lastrowid
+        return new_memory_id
     
-    def reinforce_memory(self,memory_id:int,new_source_text:str):
+    def reinforce_memory(self,memory_id:int,new_source_text:str,vector_embedding:list[float]):
         """Updates the source text and bumps the last_accessed timestamp for an existing memory."""
 
         query = """
@@ -127,6 +152,10 @@ class MemoryDatabase:
         with self._get_connection() as conn:
             cursor = conn.cursor() 
             cursor.execute(query,(new_source_text,memory_id)) 
+            if vector_embedding:
+                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
+                cursor.execute("UPDATE memory_vectors SET embedding=? VALUES WHERE rowid=?",
+                (vector_bytes,memory_id))
             conn.commit()          
     
     def deprecate_memory(self,memory_id:int):
@@ -138,7 +167,7 @@ class MemoryDatabase:
             cursor.execute(query,(memory_id,)) 
             conn.commit()
     
-    def touch_memory(self,memory_id:int,new_source_text:str):
+    def touch_memory(self,memory_id:int,new_source_text:str,vector_embedding:list[float]):
         """Updates the access heartbeat when a memory is accessed or confirmed."""
         query = """UPDATE semantic_memories SET source_text=?,
                 last_accessed = CURRENT_TIMESTAMP,
@@ -150,29 +179,129 @@ class MemoryDatabase:
         with self._get_connection() as conn:
             cursor = conn.cursor() 
             cursor.execute(query,(new_source_text,memory_id)) 
+            if vector_embedding:
+                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
+                cursor.execute("UPDATE memory_vectors SET embedding=? VALUES WHERE rowid=?",
+                (vector_bytes,memory_id))
             conn.commit()
 
-    def search_ranked_memories(self,search_term:str,limit:int=10)->list[dict]:
+    def search_hybrid_memories(self,search_term:str,query_embedding:list[float],limit:int=10)->list[dict]:
         """
-        Search active memories using full text keyword match across subject,
-        predicate, and object, ranking the results via unified cognitive scoring formula.
+        Search active memories using a HYBRID approach(Vector Semantic Search + Keyword Match),
+        ranking the results via unified cognitive scoring formula.
         """
-        query = """
-            SELECT *,
-            -- The cognitive ranking formula --
-            (importance_score * confidence * MIN(3.0,1.0+(strength-1.0)*0.2))/
-            (1.0+(julianday('now')-julianday(last_accessed))*0.05) AS cognitive_rank
-            FROM semantic_memories
-            WHERE is_active = 1
-            AND (subject LIKE ? OR predicate LIKE ? OR object LIKE ?)
-            ORDER BY cognitive_rank DESC
-            LIMIT ?
-        """
+        vector_bytes = sqlite_vec.serialize_float32(query_embedding)
         like_term = f"%{search_term.strip()}%"
+
+        # Grabbing the top 50 semantic matches, plus any direct keyword matches,
+        # then applying cognitive rank to the combined pool.
+        query = """
+            WITH
+-- 1. Exact keyword matches
+keyword_matches AS (
+    SELECT
+        rowid,
+        1 AS keyword_hit,
+        0.0 AS distance
+    FROM semantic_memories
+    WHERE is_active = 1
+      AND (
+            subject LIKE ?
+         OR predicate LIKE ?
+         OR object LIKE ?
+      )
+),
+-- 2. Semantic vector matches
+vector_matches AS (
+    SELECT
+        rowid,
+        0 AS keyword_hit,
+        distance
+    FROM memory_vectors
+    WHERE embedding MATCH ?
+      AND k = 50
+),
+-- 3. Merge both result sets
+combined AS (
+    SELECT
+        rowid,
+        MIN(distance) AS best_distance,
+        MAX(keyword_hit) AS keyword_hit
+    FROM (
+        SELECT * FROM keyword_matches
+        UNION ALL
+        SELECT * FROM vector_matches
+    )
+    GROUP BY rowid
+)
+-- 4. Final cognitive ranking
+SELECT
+
+    sm.*,
+    (
+
+        -- Semantic similarity
+        MAX(0.01, 1.0 - c.best_distance)
+
+        -- Exact keyword bonus
+        *
+        CASE
+            WHEN c.keyword_hit = 1 THEN 2.0
+            ELSE 1.0
+        END
+
+        -- Importance prior
+
+        * sm.importance_score
+
+        -- Extraction confidence
+        * sm.confidence
+
+        -- Reinforcement
+        
+        * MIN(
+            3.0,
+            1.0 + (sm.strength - 1.0) * 0.2
+        )
+
+    )
+
+    /
+
+    (
+        -- Recency decay
+        1.0 +
+        (
+            julianday('now') -
+            julianday(sm.last_accessed)
+        ) * 0.05
+    )
+
+    AS cognitive_rank,
+
+    c.keyword_hit,
+
+    c.best_distance
+
+FROM combined c
+
+JOIN semantic_memories sm
+ON sm.rowid = c.rowid
+
+WHERE sm.is_active = 1
+
+ORDER BY
+
+    c.keyword_hit DESC,
+
+    cognitive_rank DESC
+
+LIMIT ?
+        """
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(query,(like_term,like_term,like_term,limit))
+                cursor.execute(query,(like_term,like_term,like_term,vector_bytes,limit))
                 columns = [column[0] for column in cursor.description]
                 results = [dict(zip(columns,row)) for row in cursor.fetchall()]
             for res in results:

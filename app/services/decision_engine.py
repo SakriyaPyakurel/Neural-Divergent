@@ -1,4 +1,4 @@
-from typing import Dict,Any,Tuple,Optional 
+from typing import Dict,Any,Tuple,Optional,List
 from app.services.database import MemoryDatabase
 import logging
 from datetime import datetime,timezone,timedelta
@@ -21,7 +21,7 @@ class MemoryDecisionEngine:
         }
         logger.info(f"Decision Engine initialized.")
     
-    def _handle_duplicate(self,subject:str,predicate:str,object_val:str,new_source_text:str) -> Tuple[Optional[str],Optional[int]]:
+    def _handle_duplicate(self,subject:str,predicate:str,object_val:str,new_source_text:str,vector_embedding:Optional[List[float]]=None) -> Tuple[Optional[str],Optional[int]]:
         """The Debounce & Reinforcement Check.
         Checks if the exact fact [Subject -> Predicate -> Object] is already actively known.
         
@@ -47,7 +47,7 @@ class MemoryDecisionEngine:
                 except ValueError as e:
                     logger.warning(f"Could not parse timestamp '{last_accessed_str}' for memory {duplicate_record['id']}: {e}")
             # If passing the threshold (or if parsing is failed) -> Reinforce
-            self.db.touch_memory(duplicate_record['id'],new_source_text) 
+            self.db.touch_memory(duplicate_record['id'],new_source_text,vector_embedding) 
             logger.info(f"Memory {duplicate_record['id']} REINFORCED after temporal gap.")
             return "REINFORCED",duplicate_record['id']
 
@@ -56,7 +56,8 @@ class MemoryDecisionEngine:
     def _handle_contradiction(self,subject:str,predicate:str,object_val:str,
                               importance_score:float,event_type:str=None,memory_category:str=None,
                               source_text:str=None,reason:str=None,
-                              confidence:float=1.0,metadata:Dict = None) -> Optional[int]:
+                              confidence:float=1.0,metadata:Dict = None,
+                              vector_embedding:Optional[List[float]]=None) -> Optional[int]:
         """Contradiction Check
         Handles updates to single-value traits(e.g. Changing favorite language from Python to Rust)
         
@@ -91,7 +92,8 @@ class MemoryDecisionEngine:
                 reason=reason,
                 confidence=confidence,
                 metadata=metadata,
-                supersedes_id=old_memory['id'] # The chronological link
+                supersedes_id=old_memory['id'], # The chronological link
+                vector_embedding=vector_embedding
             )
             return new_id
         
@@ -101,7 +103,8 @@ class MemoryDecisionEngine:
     def _handle_novel(self,subject:str,predicate:str,object_val:str,
                       importance_score:float,event_type:str=None,memory_category:str = None,
                       source_text:str=None,reason:str=None,
-                      confidence:float=1.0,metadata:dict=None) -> int:
+                      confidence:float=1.0,metadata:dict=None,
+                      vector_embedding:Optional[List[float]]=None) -> int:
         """Novel entry
         Inserts an entirely new relationship node into the Proto-Graph database
         
@@ -118,13 +121,15 @@ class MemoryDecisionEngine:
             source_text=source_text,
             reason=reason,
             confidence=confidence,
-            metadata=metadata
+            metadata=metadata,
+            vector_embedding=vector_embedding
         )
     
     def process_extracted_memory(self,subject:str,predicate:str,object_val:str,
                                  importance_score:float,event_type:str=None,memory_category:str=None,
                                  source_text:str=None,reason:str=None,
-                                 confidence:float=1.0,metadata:Dict=None) -> Tuple[str,int]:
+                                 confidence:float=1.0,metadata:Dict=None,
+                                 vector_embedding:Optional[List[float]]=None) -> Tuple[str,int]:
         """
         Central cognitive router of the Memory Decision Engine
 
@@ -155,7 +160,8 @@ class MemoryDecisionEngine:
             source_text=source_text,
             reason=reason,
             confidence=confidence,
-            metadata=metadata
+            metadata=metadata,
+            vector_embedding=vector_embedding
         )
         if superseded_id is not None:
             return "SUPERSEDED",superseded_id
@@ -171,6 +177,7 @@ class MemoryDecisionEngine:
             source_text=source_text,
             reason=reason,
             confidence=confidence,
-            metadata=metadata
+            metadata=metadata,
+            vector_embedding=vector_embedding
         )
         return "NEW",new_id

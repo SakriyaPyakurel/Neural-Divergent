@@ -1,11 +1,13 @@
 from typing import List,Dict,Any,Optional
 from dataclasses import dataclass
 import logging
+from sentence_transformers import SentenceTransformer
 #Importing finalized cognitive modules
 from app.services.extractor import LocalExtractionEngine
 from app.services.semantic_classifier import SemanticClassifier
 from app.services.importance_engine import ImportanceEstimator,RetentionPolicy,OntologyLoader
 from app.services.decision_engine import MemoryDecisionEngine
+from app.services.embedding_engine import EmbeddingEngine
 from app.models.memory import MemoryCategory
 
 logger = logging.getLogger('NeuralDivergent.Orchestrator')
@@ -48,6 +50,7 @@ class NeuralDivergentOrchestrator:
                 classifier:SemanticClassifier,
                 importance_estimator:ImportanceEstimator,
                 decision_engine: MemoryDecisionEngine,
+                embedder:EmbeddingEngine,
                 ontology_path:str = "app/ontology/predicate_ontology.json"):
       """Utilizes the tools handed to it rather than creating them."""
       logger.info("Initializing Neural Divergent Cognitive Pipeline...")
@@ -55,6 +58,7 @@ class NeuralDivergentOrchestrator:
       self.classifier = classifier
       self.importance_estimator = importance_estimator 
       self.decision_engine = decision_engine 
+      self.embedding_engine = embedder
 
       # Loading the shared declerative ontology to map categories on the fly 
       self.ontology_path = ontology_path
@@ -124,7 +128,8 @@ class NeuralDivergentOrchestrator:
             )
             results_ledger.append(result.to_dict())
             continue
-
+         semantic_sentence = f"{sir.subject.strip()} {sir.relationship.strip().lower()} {sir.object.strip()} REASON: {sir.reason}"
+         vector_embeddings = self.embedding_engine.generate_embeddings(semantic_sentence)
          # Context Resolution and Storage via Decision Engine
          action,memory_id = self.decision_engine.process_extracted_memory(
             subject=sir.subject,
@@ -136,7 +141,8 @@ class NeuralDivergentOrchestrator:
             source_text=sir.source_text,
             reason=sir.reason,
             confidence=sir.confidence,
-            metadata=metadata_payload
+            metadata=metadata_payload,
+            vector_embedding=vector_embeddings
          )
 
          result = MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
