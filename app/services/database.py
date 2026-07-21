@@ -185,80 +185,66 @@ class MemoryDatabase:
                 (vector_bytes,memory_id))
             conn.commit()
 
-    def search_hybrid_memories(self,search_term:str,query_embedding:list[float],limit:int=10)->list[dict]:
+    def search_normal_memories(self,search_term:str)->list[dict]:
+        """
+        Search active memories using a ranked simple term lookup 
+        """
+        like_term = f"%{search_term.strip()}%" 
+        query = """
+                SELECT *
+                FROM semantic_memories
+                WHERE is_active = 1
+                AND (
+                LOWER(subject) LIKE LOWER(?)
+                OR LOWER(predicate) LIKE LOWER(?)
+                OR LOWER(object) LIKE LOWER(?)
+               )
+            ORDER BY importance_score DESC,
+            strength DESC,
+            confidence DESC;
+        """
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor() 
+                cursor.execute(query,(like_term,like_term,like_term))
+                columns = [column[0] for column in cursor.description] 
+                results = [dict(zip(columns,row)) for row in cursor.fetchall()]
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Search failed: {e}") 
+            return []
+        return results
+
+
+    def search_hybrid_memories(self,query_embedding:list[float],limit:int=10)->list[dict]:
         """
         Search active memories using a HYBRID approach(Vector Semantic Search + Keyword Match),
         ranking the results via unified cognitive scoring formula.
         """
         vector_bytes = sqlite_vec.serialize_float32(query_embedding)
-        like_term = f"%{search_term.strip()}%"
 
         # Grabbing the top 50 semantic matches, plus any direct keyword matches,
         # then applying cognitive rank to the combined pool.
         query = """
-            WITH
--- 1. Exact keyword matches
-keyword_matches AS (
+           WITH vector_matches AS (
     SELECT
         rowid,
-        1 AS keyword_hit,
-        0.0 AS distance
-    FROM semantic_memories
-    WHERE is_active = 1
-      AND (
-            subject LIKE ?
-         OR predicate LIKE ?
-         OR object LIKE ?
-      )
-),
--- 2. Semantic vector matches
-vector_matches AS (
-    SELECT
-        rowid,
-        0 AS keyword_hit,
         distance
     FROM memory_vectors
     WHERE embedding MATCH ?
       AND k = 50
-),
--- 3. Merge both result sets
-combined AS (
-    SELECT
-        rowid,
-        MIN(distance) AS best_distance,
-        MAX(keyword_hit) AS keyword_hit
-    FROM (
-        SELECT * FROM keyword_matches
-        UNION ALL
-        SELECT * FROM vector_matches
-    )
-    GROUP BY rowid
 )
--- 4. Final cognitive ranking
+
 SELECT
-
     sm.*,
+
+    vm.distance,
+
     (
-
-        -- Semantic similarity
-        MAX(0.01, 1.0 - c.best_distance)
-
-        -- Exact keyword bonus
-        *
-        CASE
-            WHEN c.keyword_hit = 1 THEN 2.0
-            ELSE 1.0
-        END
-
-        -- Importance prior
+        MAX(0.01, 1.0 - vm.distance)
 
         * sm.importance_score
-
-        -- Extraction confidence
         * sm.confidence
 
-        -- Reinforcement
-        
         * MIN(
             3.0,
             1.0 + (sm.strength - 1.0) * 0.2
@@ -269,39 +255,36 @@ SELECT
     /
 
     (
-        -- Recency decay
+
         1.0 +
+
         (
             julianday('now') -
             julianday(sm.last_accessed)
         ) * 0.05
+
     )
 
-    AS cognitive_rank,
+    AS cognitive_rank
 
-    c.keyword_hit,
-
-    c.best_distance
-
-FROM combined c
+FROM vector_matches vm
 
 JOIN semantic_memories sm
-ON sm.rowid = c.rowid
+ON sm.rowid = vm.rowid
 
 WHERE sm.is_active = 1
 
 ORDER BY
 
-    c.keyword_hit DESC,
+    cognitive_rank DESC,
+    vm.distance ASC
 
-    cognitive_rank DESC
-
-LIMIT ?
+LIMIT ?;
         """
         try:
             with self._get_connection() as conn:
                 cursor = conn.cursor()
-                cursor.execute(query,(like_term,like_term,like_term,vector_bytes,limit))
+                cursor.execute(query,(vector_bytes,limit))
                 columns = [column[0] for column in cursor.description]
                 results = [dict(zip(columns,row)) for row in cursor.fetchall()]
             for res in results:
