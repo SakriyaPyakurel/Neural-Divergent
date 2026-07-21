@@ -75,27 +75,51 @@ async def get_related_memories(request:Request, subject:str):
         raise HTTPException(status_code=500,detail=str(e))
     
 @memory_router.get("/search")
-async def search_cognitive_memory(
+async def normal_memory_search(
     request:Request,
-    q:str=Query(...,description="The concept,entity or keyword to search."),
-    limit:int = Query(10,description="Maximum number of memories to retrieve.")
+    q:str=Query(...,description="The concept,entity or keyword to search.")
 ):
     """
-    Query the cognitive memory graph using Hybrid Vector Search (Neural Divergent - 5)
+    Query the memory database utilizing simple term lookup ranked query feature
     """
     if not q.strip():
         raise HTTPException(status_code=400,detail="Search query cannot be empty.") 
     
-    # Grabbing the database connection and embedder from application state 
+    # Grabbing the database connection from application state 
+    db = request.app.state.db 
+    try: 
+        # Executing normal lookup search 
+        results = db.search_normal_memories(
+            search_term=q,
+        )
+        return {
+            "query":q,
+            "total_found":len(results),
+            "results":results
+        }
+    except Exception as e:
+        logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
+        raise HTTPException(status_code=500,detail="Internal Search error.")
+
+@memory_router.get("/associations")  
+async def hybrid_memory_search(
+    request:Request,
+    q:str=Query(...,description="The concept,entity or keyword to search."),
+    limit:int=Query(10,description="Number of associative(related) active memories to return")
+    ):
+    """
+    Implements hybrid search utilizing the query to return all the query-associative active memories via vector embedding
+    """
+    if not q.strip():
+       raise HTTPException(status_code=400,detail="Search query cannot be empty.")
+    
+    # Grabbing the database connection and embedder from application state
     db = request.app.state.db 
     embedder = request.app.state.embedder
+    query_vector = embedder.generate_embeddings(q)
     try:
-        # Instantly converting the user's query into a 384-dimensional vector instantly
-        query_vector = embedder.generate_embeddings(q)
-
-        # Executing the hybrid search 
+        # Executing the hybrid memory search
         results = db.search_hybrid_memories(
-            search_term=q,
             query_embedding=query_vector,
             limit=limit
         )
@@ -107,6 +131,10 @@ async def search_cognitive_memory(
     except Exception as e:
         logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
         raise HTTPException(status_code=500,detail="Internal Search error.")
+    
+
+
+
     
 @memory_router.get("/traverse") 
 async def traverse_graph(
