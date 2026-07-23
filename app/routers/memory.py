@@ -132,8 +132,69 @@ async def hybrid_memory_search(
         logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
         raise HTTPException(status_code=500,detail="Internal Search error.")
     
+@memory_router.get("/history") 
+async def memory_history(
+    request:Request,
+    subject:str|None=Query(
+        None,
+        description="Subject whose history should be retrieved",
+        examples=["user"]
+    ),
+    predicate:str|None = Query(
+        default=None,
+        description="Optional Predicate filter.",
+        examples=["favorite_programming_language"],
+    ),
+    # entity:str|None = Query(
+    #     default=None,
+    #     description="Retrieve every historical memory involving this entity.",
+    #     examples=["Python"]
+    # ),
+    include_inactive:bool=Query(
+        default=True,
+        description="Include superseded memories",
+    ),
+    limit:int=Query(
+        default=50,
+        ge=1,
+        le=500
+    )
+):
+   """
+    Retrieves the temporal history of stored memories.
 
+    If both subject and predicate are supplied,
+    returns the evolution of that relationship.
 
+    If only subject is supplied,
+    returns the subject's complete memory timeline.
+
+    If neither is supplied,
+    returns the most recently stored memories.
+    """
+   db = request.app.state.db
+   subject = subject.strip() if subject else None 
+   predicate = predicate.strip() if predicate else None
+   try:
+       if subject is None:
+          return db.get_recent_history(
+            include_inactive=include_inactive,
+            limit=limit)
+       if predicate is not None:
+           return db.get_predicate_history(
+               subject=subject,
+               predicate=predicate,
+               include_inactive=include_inactive,
+               limit=limit
+           )
+       return db.get_subject_history(
+           subject=subject,
+           include_inactive=include_inactive,
+           limit=limit
+       )
+   except Exception as e:
+       logger.error(f"Failed to search memories: {str(e)}",exc_info=True)
+       raise HTTPException(status_code=500,detail="Internal Search error.")
 
     
 @memory_router.get("/traverse") 

@@ -293,7 +293,91 @@ LIMIT ?;
         except Exception as e:
             logging.getLogger(__name__).error(f"Search failed: {e}") 
             return []
+
+    def get_subject_history(self,subject:str,include_inactive:bool=True,limit:int=50)->List[Dict[str,Any]]:
+        """
+         Returns the complete memory timeline for a subject.
+        """  
+        query = """
+        SELECT *
+        FROM semantic_memories
+        WHERE subject = ?
+        """
+        params = [subject] 
+        if not include_inactive:
+            query += " AND is_active = 1"
+        query += """
+        ORDER BY created_at DESC
+        LIMIT ?
+        """
+        params.append(limit)
+
+        try:
+            with self._get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute(query,params) 
+                columns = [column[0] for column in cursor.description] 
+                return [ dict(zip(columns,row)) for row in cursor.fetchall()]
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Subject history failed: {e}")
+            return []
+        
+    def get_predicate_history(self,subject:str,predicate:str,include_inactive:bool=True,limit:int=50)->List[Dict[str,Any]]:
+        """
+        Returns the historical evolution of a subject-predicate pair.
+        """
+        query = """
+        SELECT *
+        FROM semantic_memories
+        WHERE subject = ?
+        AND predicate = ?
+        """
+        params = [subject,predicate] 
+        if not include_inactive:
+            query += " AND is_active = 1"
+        query += """
+        ORDER BY created_at ASC
+        LIMIT ?
+        """
+        params.append(limit)
+        try:
+            with self._get_connection() as conn:
+                cursor=conn.cursor() 
+                cursor.execute(query,params) 
+                columns = [column[0] for column in cursor.description] 
+                return [dict(zip(columns,row)) for row in cursor.fetchall()] 
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Predicate history failed: {e}")
+            return []
     
+    def get_recent_history(self,include_inactive:bool=True,limit:int=50)->List[Dict[str,Any]]:
+        """
+        Returns the most recently stored memories.
+        """
+        query = """
+        SELECT *
+        FROM semantic_memories
+        """
+        params = [] 
+        if not include_inactive:
+            query += " WHERE is_active = 1"
+        query += """
+        ORDER BY created_at DESC
+        LIMIT ?
+        """
+        params.append(limit) 
+
+        try: 
+            with self._get_connection() as conn:
+                cursor=conn.cursor() 
+                cursor.execute(query,params) 
+                columns = [column[0] for column in cursor.description] 
+                return [dict(zip(columns,row)) for row in cursor.fetchall()]
+        except Exception as e:
+            logging.getLogger(__name__).error(f"Recent history failed: {e}")
+            return []
+
+
     def traverse_memory_graph(self,root_entity:str,limit:int=15) -> List[Dict[str,Any]]:
         """
         Performs a 1-degree graph traversal from a root entity.
