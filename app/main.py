@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager 
 import logging 
+from pathlib import Path
 
 # Importing services 
 from app.services.database import MemoryDatabase 
@@ -23,40 +24,50 @@ logger = logging.getLogger(__name__)
 async def lifespan(app:FastAPI):
     """Application lifecycle manager of Neural Divergent.""" 
     logging.info("Booting up Neural Divergent Cognitive Engine...") 
+    try:
+       # Initializing the database from the file 
+       db_file = Path("db.txt")
+       db_path = None
+       if db_file.exists():
+         db_path = db_file.read_text().strip() or None
+       db = MemoryDatabase(db_path=db_path) if db_path is not None else MemoryDatabase()
+       app.state.db = db 
+       logger.info(f"Using cognitive database: {db_path}")
 
-    # Initializing the database 
-    db = MemoryDatabase(db_path='neural_divergent_test.db') 
-    app.state.db = db 
+       ONTOLOGY_PATH = "app/ontology/predicate_ontology.json"
+       # loading dependencies(Ontology,Estimator,Decision Engine,Extractor,semantic classifier)
+       registry = OntologyLoader.get_registry(ONTOLOGY_PATH) 
+       importance_estimator = ImportanceEstimator(ontology_path=ONTOLOGY_PATH)
+       decision_engine = MemoryDecisionEngine(db=db,registry=registry) 
+       extractor = LocalExtractionEngine()
+       classifier = SemanticClassifier()
+       embedder = EmbeddingEngine()
 
-    # loading dependencies(Ontology,Estimator,Decision Engine,Extractor,semantic classifier)
-    registry = OntologyLoader.get_registry("app/ontology/predicate_ontology.json") 
-    importance_estimator = ImportanceEstimator(ontology_path="app/ontology/predicate_ontology.json")
-    decision_engine = MemoryDecisionEngine(db=db,registry=registry) 
-    extractor = LocalExtractionEngine()
-    classifier = SemanticClassifier()
-    embedder = EmbeddingEngine()
-
-    # Initializing the orchestrator and attach to state (needed for ingestion) 
-    orchestrator = NeuralDivergentOrchestrator(
+      # Initializing the orchestrator and attach to state (needed for ingestion) 
+       orchestrator = NeuralDivergentOrchestrator(
         extractor=extractor,
         classifier=classifier,
         importance_estimator=importance_estimator,
         decision_engine=decision_engine,
         embedder=embedder
-    )
-    app.state.embedder = embedder
-    app.state.orchestrator = orchestrator
+        )
+       app.state.embedder = embedder
+       app.state.orchestrator = orchestrator
 
-    # Spawning the Cognitive Decay Engine
-    # Checking every hour(3600s), archiving if rank drops below 0.12
-    decay_engine = CognitiveDecayEngine(db=db,check_interval_seconds=3600,decay_threshold=0.12)
-    app.state.decay_engine = decay_engine
-    
-    logger.info("Cognitive services and Decay Scheduler initialized..")
-    yield 
-    logger.info("Shutting down Neural Divergent. Flushing down transient memory...")
-    # Stopping background tasks gracefully before complete shutdown.
-    await decay_engine.stop()
+       # Spawning the Cognitive Decay Engine
+       # Checking every hour(3600s), archiving if rank drops below 0.12
+       decay_engine = CognitiveDecayEngine(db=db,check_interval_seconds=3600,decay_threshold=0.12)
+       await decay_engine.start()
+       app.state.decay_engine = decay_engine
+       logger.info("Neural Divergent initialized successfully.")
+       yield 
+    except Exception as e:
+       logger.exception(f"Failed to initialize Neural Divergent: {e}")
+       raise
+    finally:
+       logger.info("Shutting down Neural Divergent.") 
+       if decay_engine is not None:
+          await decay_engine.stop()
 
 app = FastAPI(title="Neural-Divergent API",
               description="The Cognitive orchestrator and memory decision engine.",
