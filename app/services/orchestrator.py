@@ -8,6 +8,7 @@ from app.services.semantic_classifier import SemanticClassifier
 from app.services.importance_engine import ImportanceEstimator,RetentionPolicy,OntologyLoader
 from app.services.decision_engine import MemoryDecisionEngine
 from app.services.embedding_engine import EmbeddingEngine
+from app.services.semantic_normalizer import SemanticNormalizer
 from app.models.memory import MemoryCategory
 
 logger = logging.getLogger('NeuralDivergent.Orchestrator')
@@ -51,6 +52,7 @@ class NeuralDivergentOrchestrator:
                 importance_estimator:ImportanceEstimator,
                 decision_engine: MemoryDecisionEngine,
                 embedder:EmbeddingEngine,
+                normalizer:SemanticNormalizer,
                 ontology_path:str = "app/ontology/predicate_ontology.json"):
       """Utilizes the tools handed to it rather than creating them."""
       logger.info("Initializing Neural Divergent Cognitive Pipeline...")
@@ -59,6 +61,7 @@ class NeuralDivergentOrchestrator:
       self.importance_estimator = importance_estimator 
       self.decision_engine = decision_engine 
       self.embedding_engine = embedder
+      self.normalizer = normalizer
 
       # Loading the shared declerative ontology to map categories on the fly 
       self.ontology_path = ontology_path
@@ -85,6 +88,18 @@ class NeuralDivergentOrchestrator:
        
        # Processing each extracted structural triple 
       for sir in sirs:
+         # Converting raw syntax into cannonical cognitive concepts
+         raw_candidate = {
+             "subject": sir.subject,
+             "predicate": sir.relationship,
+             "object": sir.object
+         }
+         normalized = self.normalizer.normalize(raw_candidate)
+         
+         # Overwriting grammatical extraction with normalized cognitive concepts
+         sir.subject = normalized["subject"]
+         sir.relationship = normalized["predicate"]
+         sir.object = normalized["object"]
          # looking up the configured properties of the predicate from the declerative ontology
          predicate_config = self.ontology.get(sir.relationship.lower(),{})
 

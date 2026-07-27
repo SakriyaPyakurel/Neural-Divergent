@@ -1,0 +1,234 @@
+{
+"subjects": {
+"i": "user",
+"me": "user",
+"my": "user",
+"myself": "user"
+},
+
+"predicates": {
+"grow": [
+{
+"contains": ["neighborhood", "city", "town", "village"],
+"predicate": "childhood_environment"
+}
+],
+"consider": [
+{
+"contains": ["hometown"],
+"predicate": "hometown"
+}
+],
+"learn": [
+{
+"contains": ["swim", "swimming"],
+"predicate": "skill",
+"object": "swimming"
+},
+{
+"contains": ["ride a bicycle", "ride bicycle", "bicycle"],
+"predicate": "skill",
+"object": "cycling"
+},
+{
+"contains": ["count"],
+"predicate": "skill",
+"object": "counting"
+},
+{
+"contains": ["alphabet"],
+"predicate": "skill",
+"object": "alphabet"
+},
+{
+"contains": ["arithmetic"],
+"predicate": "skill",
+"object": "arithmetic"
+}
+],
+"become": [
+{
+"contains": ["interested"],
+"predicate": "interest"
+},
+{
+"contains": ["fascinated"],
+"predicate": "interest"
+},
+{
+"contains": ["curious"],
+"predicate": "trait"
+},
+{
+"contains": ["confident"],
+"predicate": "personality_trait"
+}
+],
+"enjoy": [
+{
+"contains": ["reading"],
+"predicate": "hobby"
+},
+{
+"contains": ["drawing"],
+"predicate": "hobby"
+},
+{
+"contains": ["lego"],
+"predicate": "hobby"
+},
+{
+"contains": ["soccer"],
+"predicate": "hobby"
+},
+{
+"contains": ["cycling"],
+"predicate": "hobby"
+}
+],
+"love": [
+{
+"contains": ["dogs"],
+"predicate": "likes"
+},
+{
+"contains": ["cats"],
+"predicate": "likes"
+},
+{
+"contains": ["python"],
+"predicate": "favorite_programming_language"
+}
+],
+"work": [
+{
+"contains": ["architect"],
+"predicate": "occupation"
+},
+{
+"contains": ["teacher"],
+"predicate": "occupation"
+},
+{
+"contains": ["engineer"],
+"predicate": "occupation"
+}
+],
+"live": [
+{
+"contains": [],
+"predicate": "residence"
+}
+],
+"spend": [
+{
+"contains": ["childhood"],
+"predicate": "childhood_location"
+},
+{
+"contains": ["time", "weekend", "vacation"],
+"predicate": "habit"
+}
+],
+"am": [
+{
+"contains": ["youngest", "oldest", "middle"],
+"predicate": "birth_order"
+}
+],
+"is": [
+{
+"contains": ["youngest", "oldest", "middle"],
+"predicate": "birth_order"
+}
+],
+"was": [
+{
+"contains": ["youngest", "oldest", "middle"],
+"predicate": "birth_order"
+}
+],
+"read": [
+{
+"contains": [],
+"predicate": "hobby"
+}
+]
+},
+
+"objects": {
+"to swim": "swimming",
+"ride a bicycle": "cycling",
+"ride bicycle": "cycling",
+"interested in science": "science",
+"fascinated by birds": "birds",
+"building lego": "lego",
+"lego bricks": "lego",
+"large box of lego bricks": "lego",
+"nature documentaries": "nature",
+"children's books": "books",
+"picture books": "books",
+"educational software": "software",
+"desktop computer": "computer",
+"most of my childhood in ": "",
+"my childhood in ": "",
+"the youngest child in my family": "youngest_child",
+"the youngest child": "youngest_child",
+"the oldest child in my family": "oldest_child",
+"the oldest child": "oldest_child",
+"the middle child in my family": "middle_child",
+"the middle child": "middle_child",
+"from my mistakes": "learning_from_mistakes"
+},
+
+"phrase_patterns": [
+{
+"contains": "learn from my mistakes",
+"predicate": "trait",
+"object": "resilient"
+},
+{
+"contains": "how things worked",
+"predicate": "interest",
+"object": "engineering"
+},
+{
+"contains": "how machines worked",
+"predicate": "interest",
+"object": "engineering"
+},
+{
+"contains": "how computers worked",
+"predicate": "interest",
+"object": "computer science"
+},
+{
+"contains": "bedtime stories",
+"predicate": "habit",
+"object": "reading"
+},
+{
+"contains": "school holidays",
+"predicate": "family_tradition"
+},
+{
+"contains": "every weekend",
+"predicate": "habit"
+}
+],
+
+"canonical_objects": {
+"lego": "Lego",
+"python": "Python",
+"rust": "Rust",
+"javascript": "JavaScript",
+"html": "HTML",
+"css": "CSS",
+"mysql": "MySQL",
+"fastapi": "FastAPI",
+"spacy": "spaCy",
+"sqlite": "SQLite",
+"sqlite-vec": "sqlite-vec",
+"sentence-transformers": "SentenceTransformers"
+}
+}

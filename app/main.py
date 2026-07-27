@@ -12,6 +12,7 @@ from app.services.semantic_classifier import SemanticClassifier
 from app.services.orchestrator import NeuralDivergentOrchestrator 
 from app.services.decay_engine import CognitiveDecayEngine
 from app.services.embedding_engine import EmbeddingEngine
+from app.services.semantic_normalizer import SemanticNormalizer
 
 # importing routers
 from app.routers.memory import memory_router
@@ -35,6 +36,7 @@ async def lifespan(app:FastAPI):
        logger.info(f"Using cognitive database: {db_path}")
 
        ONTOLOGY_PATH = "app/ontology/predicate_ontology.json"
+       SEMANTIC_PATH = "app/ontology/semantic_normalization.json"
        # loading dependencies(Ontology,Estimator,Decision Engine,Extractor,semantic classifier)
        registry = OntologyLoader.get_registry(ONTOLOGY_PATH) 
        importance_estimator = ImportanceEstimator(ontology_path=ONTOLOGY_PATH)
@@ -42,6 +44,7 @@ async def lifespan(app:FastAPI):
        extractor = LocalExtractionEngine()
        classifier = SemanticClassifier()
        embedder = EmbeddingEngine()
+       normalizer = SemanticNormalizer(rules_path=SEMANTIC_PATH)
 
       # Initializing the orchestrator and attach to state (needed for ingestion) 
        orchestrator = NeuralDivergentOrchestrator(
@@ -49,7 +52,8 @@ async def lifespan(app:FastAPI):
         classifier=classifier,
         importance_estimator=importance_estimator,
         decision_engine=decision_engine,
-        embedder=embedder
+        embedder=embedder,
+        normalizer=normalizer
         )
        app.state.embedder = embedder
        app.state.orchestrator = orchestrator
