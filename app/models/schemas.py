@@ -10,6 +10,7 @@ class MemoryAction(str,Enum):
     REINFORCED="REINFORCED"
     SUPERSEDED="SUPERSEDED" 
     IGNORED = "IGNORED"
+    REJECTED_LOW_CONFIDENCE = "REJECTED_LOW_CONFIDENCE"
 
 class RetentionPolicy(str,Enum):
     EPHEMERAL = "EPHEMERAL"
