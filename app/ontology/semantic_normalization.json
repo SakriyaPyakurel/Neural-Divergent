@@ -9,7 +9,7 @@
 "predicates": {
 "grow": [
 {
-"contains": ["neighborhood", "city", "town", "village"],
+"contains": ["neighborhood", "city", "town", "village", "up in"],
 "predicate": "childhood_environment"
 }
 ],
@@ -57,76 +57,98 @@
 },
 {
 "contains": ["curious"],
-"predicate": "trait"
+"predicate": "trait",
+"object": "curious"
 },
 {
 "contains": ["confident"],
-"predicate": "personality_trait"
+"predicate": "trait",
+"object": "confident"
 }
 ],
 "enjoy": [
 {
+"contains": ["exploring", "explore", "places", "travel"],
+"predicate": "exploration"
+},
+{
 "contains": ["reading"],
-"predicate": "hobby"
+"predicate": "hobby",
+"object": "reading"
 },
 {
 "contains": ["drawing"],
-"predicate": "hobby"
+"predicate": "hobby",
+"object": "drawing"
 },
 {
 "contains": ["lego"],
-"predicate": "hobby"
+"predicate": "hobby",
+"object": "lego"
 },
 {
 "contains": ["soccer"],
-"predicate": "hobby"
+"predicate": "hobby",
+"object": "soccer"
 },
 {
 "contains": ["cycling"],
-"predicate": "hobby"
+"predicate": "hobby",
+"object": "cycling"
+},
+{
+"contains": ["helping"],
+"predicate": "trait",
+"object": "helpful"
 }
 ],
 "love": [
 {
 "contains": ["dogs"],
-"predicate": "likes"
+"predicate": "like",
+"object": "dogs"
 },
 {
 "contains": ["cats"],
-"predicate": "likes"
+"predicate": "like",
+"object": "cats"
 },
 {
 "contains": ["python"],
-"predicate": "favorite_programming_language"
+"predicate": "favorite_programming_language",
+"object": "Python"
 }
 ],
 "work": [
 {
 "contains": ["architect"],
-"predicate": "occupation"
+"predicate": "primary_category",
+"object": "architecture"
 },
 {
 "contains": ["teacher"],
-"predicate": "occupation"
+"predicate": "primary_category",
+"object": "education"
 },
 {
 "contains": ["engineer"],
-"predicate": "occupation"
+"predicate": "primary_category",
+"object": "engineering"
 }
 ],
 "live": [
 {
 "contains": [],
-"predicate": "residence"
+"predicate": "childhood_environment"
 }
 ],
 "spend": [
 {
 "contains": ["childhood"],
-"predicate": "childhood_location"
+"predicate": "childhood_environment"
 },
 {
-"contains": ["time", "weekend", "vacation"],
+"contains": ["time", "weekend", "vacation", "hours"],
 "predicate": "habit"
 }
 ],
@@ -134,24 +156,64 @@
 {
 "contains": ["youngest", "oldest", "middle"],
 "predicate": "birth_order"
+},
+{
+"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
+"predicate": "trait"
+},
+{
+"contains": ["years old", "yo"],
+"predicate": "age"
 }
 ],
 "is": [
 {
 "contains": ["youngest", "oldest", "middle"],
 "predicate": "birth_order"
+},
+{
+"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
+"predicate": "trait"
 }
 ],
 "was": [
 {
 "contains": ["youngest", "oldest", "middle"],
 "predicate": "birth_order"
+},
+{
+"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
+"predicate": "trait"
+}
+],
+"take": [
+{
+"contains": ["apart", "disassemble", "toys", "machines"],
+"predicate": "habit",
+"object": "disassembling_objects"
+}
+],
+"ask": [
+{
+"contains": ["questions", "why", "how"],
+"predicate": "trait",
+"object": "inquisitive"
+}
+],
+"start": [
+{
+"contains": ["learning", "studying"],
+"predicate": "learn"
+},
+{
+"contains": ["working", "building"],
+"predicate": "working_on"
 }
 ],
 "read": [
 {
 "contains": [],
-"predicate": "hobby"
+"predicate": "habit"
 }
 ]
 },
@@ -189,17 +251,17 @@
 },
 {
 "contains": "how things worked",
-"predicate": "interest",
+"predicate": "like",
 "object": "engineering"
 },
 {
 "contains": "how machines worked",
-"predicate": "interest",
+"predicate": "like",
 "object": "engineering"
 },
 {
 "contains": "how computers worked",
-"predicate": "interest",
+"predicate": "like",
 "object": "computer science"
 },
 {
@@ -209,7 +271,7 @@
 },
 {
 "contains": "school holidays",
-"predicate": "family_tradition"
+"predicate": "habit"
 },
 {
 "contains": "every weekend",

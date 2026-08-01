@@ -9,6 +9,7 @@ from app.services.importance_engine import ImportanceEstimator,RetentionPolicy,O
 from app.services.decision_engine import MemoryDecisionEngine
 from app.services.embedding_engine import EmbeddingEngine
 from app.services.semantic_normalizer import SemanticNormalizer
+from app.services.memory_refiner import  MemoryRefiner
 from app.models.memory import MemoryCategory
 
 logger = logging.getLogger('NeuralDivergent.Orchestrator')
@@ -62,6 +63,7 @@ class NeuralDivergentOrchestrator:
       self.decision_engine = decision_engine 
       self.embedding_engine = embedder
       self.normalizer = normalizer
+      self.refiner = MemoryRefiner()
 
       # Loading the shared declerative ontology to map categories on the fly 
       self.ontology_path = ontology_path
@@ -86,20 +88,30 @@ class NeuralDivergentOrchestrator:
       cached_event_type: str = None 
       cached_confidence: float = None
        
-       # Processing each extracted structural triple 
+      # Processing each extracted structural triple 
+      normalized_candidates = []
       for sir in sirs:
          # Converting raw syntax into cannonical cognitive concepts
          raw_candidate = {
              "subject": sir.subject,
              "predicate": sir.relationship,
-             "object": sir.object
+             "object": sir.object,
+             "original_sir":sir
          }
          normalized = self.normalizer.normalize(raw_candidate)
-         
-         # Overwriting grammatical extraction with normalized cognitive concepts
-         sir.subject = normalized["subject"]
-         sir.relationship = normalized["predicate"]
-         sir.object = normalized["object"]
+         normalized_candidates.append(normalized)
+
+         # Memory refinement(pruning pass) - discarding noisy/weak triples if strong ontology matches exist in the batch
+         ontology_keys = set(self.ontology.keys()) 
+         refined_candidates = self.refiner.refine(normalized_candidates,ontology_keys)
+
+         # Cognitive processing pass - Processing only the refined high value candidates 
+         for r_candidate in refined_candidates:
+           sir = r_candidate["original_sir"]
+           # Overwriting grammatical extraction with refined cognitive concepts
+           sir.subject = r_candidate.get("subject") or ""
+           sir.relationship = r_candidate.get("predicate") or ""
+           sir.object = r_candidate.get("object") or ""
          # looking up the configured properties of the predicate from the declerative ontology
          predicate_config = self.ontology.get(sir.relationship.lower(),{})
 
