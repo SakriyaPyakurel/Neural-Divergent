@@ -1,11 +1,10 @@
-# Neural Divergent
-## A Deterministic Cognitive Memory Architecture for AI Systems
+Neural Divergent
 
-Version: 0.4.x (Current Development)
+A Deterministic Cognitive Memory Architecture for AI Systems
 
----
+Version: 0.5.x (Current Development)
 
-# Overview
+Overview
 
 Neural Divergent is a deterministic cognitive memory architecture designed to improve how AI assistants understand, store, organize, retrieve and reason over conversational information.
 
@@ -13,9 +12,11 @@ Unlike traditional LLM memory systems that rely heavily on embeddings or repeate
 
 The philosophy is simple:
 
-> Convert natural language into structured semantic knowledge first.
-> Think before retrieving.
-> Retrieve before generating.
+Convert natural language into structured semantic knowledge first.
+
+Think before retrieving.
+
+Retrieve before generating.
 
 The project is not intended to replace Large Language Models.
 
@@ -23,24 +24,23 @@ Instead, it functions as a cognitive layer sitting between human conversation an
 
 This architecture allows:
 
-- significantly lower token consumption
-- deterministic memory formation
-- explainable reasoning
-- contradiction management
-- semantic graph growth
-- future knowledge graph migration
+significantly lower token consumption
 
----
+deterministic memory formation
 
-# Project Vision
+explainable reasoning
 
-Current AI assistants largely depend on context windows.
+contradiction management
 
-Once the conversation becomes large, they begin forgetting previous information, hallucinating relationships, or repeatedly consuming tokens to rediscover already known facts.
+semantic graph growth
 
-Neural Divergent aims to solve this by introducing an explicit cognitive memory architecture.
+future knowledge graph migration
 
-Instead of repeatedly asking an LLM to understand everything again, the system builds a structured memory graph that continuously evolves.
+Project Vision
+
+Current AI assistants largely depend on context windows. Once the conversation becomes large, they begin forgetting previous information, hallucinating relationships, or repeatedly consuming tokens to rediscover already known facts.
+
+Neural Divergent aims to solve this by introducing an explicit cognitive memory architecture. Instead of repeatedly asking an LLM to understand everything again, the system builds a structured memory graph that continuously evolves.
 
 Long-term goal:
 
@@ -62,7 +62,7 @@ Targeted Retrieval
 
 LLM Reasoning
 
-Instead of
+Instead of:
 
 Conversation
 
@@ -78,34 +78,33 @@ LLM
 
 Repeat Forever
 
----
+Design Philosophy
 
-# Design Philosophy
+The architecture follows several core principles:
 
-The architecture follows several principles.
+Deterministic First
 
-## Deterministic First
-
-Whenever deterministic algorithms can solve a problem,
-they should always execute before expensive probabilistic AI.
+Whenever deterministic algorithms can solve a problem, they should always execute before expensive probabilistic AI.
 
 Examples:
 
-- dependency parsing
-- relationship extraction
-- contradiction detection
-- duplicate detection
-- semantic normalization
+dependency parsing
+
+relationship extraction
+
+contradiction detection
+
+duplicate detection
+
+semantic normalization
+
+cognitive pruning
 
 These operations should never require an LLM.
 
----
+Minimize Token Consumption
 
-## Minimize Token Consumption
-
-Every unnecessary token sent to an LLM costs money.
-
-Neural Divergent attempts to reduce conversational redundancy before retrieval.
+Every unnecessary token sent to an LLM costs money. Neural Divergent attempts to reduce conversational redundancy before retrieval.
 
 The objective is:
 
@@ -127,9 +126,7 @@ Minimal Prompt
 
 LLM
 
----
-
-## Explainability
+Explainability
 
 Every stored memory should answer:
 
@@ -143,37 +140,33 @@ Why does it still exist?
 
 Why did it replace another memory?
 
----
+Modular Architecture
 
-## Modular Architecture
+Each component performs exactly one responsibility. No module performs another module's job. This keeps the pipeline maintainable and independently testable.
 
-Each component performs exactly one responsibility.
-
-No module performs another module's job.
-
-This keeps the pipeline maintainable and independently testable.
-
----
-
-# Current Cognitive Pipeline
+Current Cognitive Pipeline
 
 User Message
 
 ↓
 
-Local Extraction Engine
+Local Extraction Engine (Grammar to Syntax)
 
 ↓
 
-Semantic Normalization
+Semantic Normalizer (Syntax to Cognitive Concepts)
 
 ↓
 
-Importance Estimator
+Memory Refiner (Batch Pruning & Deduplication)
 
 ↓
 
-Memory Decision Engine
+Importance Estimator (Cognitive Valuation)
+
+↓
+
+Memory Decision Engine (Graph Consistency)
 
 ↓
 
@@ -185,565 +178,216 @@ Retrieval APIs
 
 ↓
 
-(Future)
+(Future) Embedding Retrieval / LLM
 
-Embedding Retrieval
+Component Overview
 
-↓
-
-LLM
-
----
-
-# Component Overview
-
-## 1. Local Extraction Engine
+1. Local Extraction Engine
 
 Purpose
 
-Transform raw natural language into deterministic semantic representations.
+Transform raw natural language into deterministic syntactic representations.
 
 Responsibilities
 
-- dependency parsing
-- linguistic normalization
-- SIR construction
-- reason extraction
-- negation detection
-- relationship normalization
-- metadata generation
+dependency parsing
+
+linguistic normalization
+
+SIR (Subject-Intent-Relationship) construction
+
+reason extraction
+
+negation detection
 
 Output
 
-SemanticRepresentation
+Raw Semantic Representation containing subject, relationship, object, confidence, metadata, reason, and source text.
 
-containing
-
-- subject
-- relationship
-- object
-- confidence
-- metadata
-- reason
-- source text
-
----
-
-## 2. Importance Estimator
+2. Semantic Normalizer (Cognitive Language Layer)
 
 Purpose
 
-Estimate whether information deserves memory.
+Transforms raw syntax dependencies into stable, canonical cognitive concepts. Driven by external JSON configurations (semantic_normalization.json) for zero-code expandability.
 
-This stage performs cognitive valuation.
+Responsibilities (4-Pass Pipeline)
 
-Inputs
+Pass 1: Subject Canonicalization (e.g., standardizing pronouns)
 
-SemanticRepresentation
+Pass 2: Phrase Pattern Matching (High-context mapping)
 
-Outputs
+Pass 3: Object Noise Reduction & Canonical Casing (e.g., "interested in science" -> "science")
 
-- importance prior
-- retention policy
+Pass 4: Predicate Rule Application
 
-Current capabilities
+3. Memory Refiner (Cognitive Pruner)
 
-- ontology-driven predicate evaluation
-- configurable ontology JSON
-- confidence weighting
-- contextual boosting
-- reasoning bonus
-- negation penalty
-- noise filtering
+Purpose
 
-Retention Policies
+Evaluates batches of normalized triples from a single source text to filter out noise before valuation.
 
-EPHEMERAL
+Responsibilities
 
-SHORT_TERM
+Deduplication: Prevents identical semantic meanings from flooding the pipeline.
 
-LONG_TERM
+Ontology Enforcement: Promotes "Strong" (ontology-backed) triples over "Weak" grammatical constructs.
 
-Importance Prior
+Stop-Verb Pruning: Aggressively discards weak syntactic helpers (e.g., "is", "was", "make", "do") if better cognitive concepts exist in the same sentence.
 
-0.0 → 1.0
+4. Importance Estimator & Declarative Ontology
 
----
+Purpose
 
-## Predicate Ontology
+Estimate whether information deserves memory based on a declarative ontology (predicate_ontology.json).
 
-The system now uses a declarative ontology rather than hardcoded logic.
+Ontology Schema Example
 
-Example
+"working_on": {
+  "category": "project",
+  "importance": "MEDIUM",
+  "retention": "SHORT_TERM",
+  "exclusive": false,
+  "allow_multiple": true,
+  "supports_negation": false,
+  "supports_reason": true,
+  "graph_node_type": "ACTIVITY"
+}
 
-```
-name
-
-importance: CRITICAL
-
-retention: LONG_TERM
-
-category: IDENTITY
-```
 
 Benefits
 
-- zero-code ontology updates
-- scalable
-- easily extendable
-- future knowledge graph compatible
+Zero-code ontology updates
 
----
+Richer categorization (identity, experience, project, preference)
 
-## 3. Memory Decision Engine
+Explicit Node types for future Knowledge Graphs
+
+Confidence weighting, reasoning bonuses, and negation penalties
+
+5. Memory Decision Engine
 
 Purpose
 
-Maintain consistency inside memory.
+Maintain strict logical consistency inside the memory graph, now assisted by Vector Embeddings for fuzzy-duplicate detection.
 
-Responsibilities
+Current Actions:
 
-Duplicate Detection
+NEW: Novel information stored.
 
-Existing fact?
+REINFORCED: Existing fact observed again (increases weight).
 
-↓
+SUPERSEDED: Existing truth contradicted and overwritten.
 
-REINFORCED
+IGNORED: Trivial or duplicate data dropped.
 
-Contradiction Detection
+REJECTED_LOW_CONFIDENCE: Data fell below the cognitive threshold.
 
-Existing truth?
+6. Proto-Graph Memory Database
 
-↓
+Current implementation: SQLite
+Schema: semantic_memories
 
-SUPERSEDED
+Stores:
 
-Novel Information
+subject, predicate, object, importance, retention, confidence, metadata, reason, event type, memory category, reinforcement count, timestamps, active state, superseded links.
 
-↓
+The database behaves like a lightweight semantic graph (Subject -> Relationship -> Object) preparing for an eventual migration to Neo4j or Memgraph.
 
-NEW
+7. Orchestrator
 
-Current actions
+The central pipeline coordinator. It contains no business logic. Instead, it delegates work strictly to injected cognitive engines (Extractor -> Normalizer -> Refiner -> Estimator -> Decision -> Storage) and returns the processing ledger.
 
-NEW
+Current API
 
-REINFORCED
+Base Route: /api/v1/memory
 
-SUPERSEDED
+POST /ingest
 
-IGNORED
+Processes natural language into cognitive memory via the full extraction, normalization, pruning, and decision pipeline. Returns a ledger of actions taken (NEW, REINFORCED, PRUNED, etc.).
 
----
+GET /active
 
-## 4. Proto-Graph Memory Database
+Returns active truth for Subject + Predicate.
 
-Current implementation
+GET /related/{subject}
 
-SQLite
+Returns connected active memories for a given subject.
 
-Schema
+GET /search
 
-semantic_memories
+Ranked semantic memory retrieval considering importance, confidence, reinforcement, and recency.
 
-Stores
+GET /traverse
 
-subject
+Associative graph traversal (Depth 0 matches -> Depth 1 connected memories).
 
-predicate
-
-object
-
-importance
-
-retention
-
-confidence
-
-metadata
-
-reason
-
-event type
-
-memory category
-
-reinforcement count
-
-timestamps
-
-active state
-
-superseded links
-
-The database behaves like a lightweight semantic graph.
-
----
-
-## Graph Principles
-
-Each row represents
-
-Subject
-
-↓
-
-Relationship
-
-↓
-
-Object
-
-instead of traditional relational rows.
-
-Example
-
-User
-
-↓
-
-favorite_language
-
-↓
-
-Python
-
-Future migration
-
-SQLite
-
-↓
-
-Neo4j
-
-or
-
-↓
-
-Memgraph
-
-without changing higher-level logic.
-
----
-
-## 5. Orchestrator
-
-The orchestrator coordinates the entire pipeline.
-
-Responsibilities
-
-Receive user input
-
-↓
-
-Extraction
-
-↓
-
-Importance Estimation
-
-↓
-
-Decision Engine
-
-↓
-
-Persistence
-
-↓
-
-Return processing ledger
-
-The orchestrator contains no business logic.
-
-It delegates work.
-
----
-
-# Current API
-
-Base Route
-
-/api/v1/memory
-
-Implemented endpoints
-
-POST
-
-/ingest
-
-Processes natural language into cognitive memory.
-
-Pipeline
-
-Text
-
-↓
-
-Extraction
-
-↓
-
-Importance
-
-↓
-
-Decision
-
-↓
-
-Storage
-
-↓
-
-Response
-
-Returns
-
-- processed memories
-- ignored memories
-- importance
-- retention
-- action
-- confidence
-
----
-
-GET
-
-/active
-
-Returns active truth for
-
-Subject
-
-+
-
-Predicate
-
-Example
-
-User
-
-favorite_language
-
-↓
-
-Python
-
----
-
-GET
-
-/related/{subject}
-
-Returns connected active memories.
-
-Example
-
-User
-
-↓
-
-works_on
-
-↓
-
-Neural Divergent
-
-↓
-
-uses
-
-↓
-
-FastAPI
-
----
-
-GET
-
-/search
-
-Ranked semantic memory retrieval.
-
-Ranking considers
-
-- importance
-- confidence
-- reinforcement
-- recency
-
----
-
-GET
-
-/traverse
-
-Associative graph traversal.
-
-Returns
-
-Depth 0
-
-↓
-
-Direct matches
-
-↓
-
-Depth 1
-
-↓
-
-Connected memories
-
-Foundation for future reasoning.
-
----
-
-# Features Implemented
+Features Implemented
 
 ✓ Local deterministic NLP extraction
 
-✓ Semantic normalization
+✓ 4-Pass Semantic Normalization (JSON-Driven)
+
+✓ Cognitive Memory Refinement & Stop-Verb Pruning
 
 ✓ Subject–Predicate–Object representation
 
-✓ Confidence estimation
-
-✓ Negation handling
+✓ Confidence estimation & Negation handling
 
 ✓ Reason extraction
 
-✓ Ontology-driven importance estimation
+✓ Rich Declarative Predicate Ontology (Categories & Node Types)
 
-✓ Configurable predicate ontology
+✓ Retention policies (EPHEMERAL, SHORT_TERM, LONG_TERM)
 
-✓ Retention policies
+✓ Duplicate detection (Embedding Assisted)
 
-✓ Duplicate detection
-
-✓ Contradiction handling
+✓ Contradiction handling & Soft supersession
 
 ✓ Reinforcement learning of existing memories
 
-✓ Soft memory supersession
-
 ✓ Proto-graph database
 
-✓ Active truth queries
-
-✓ Related memory retrieval
-
-✓ Ranked memory search
+✓ Active truth, Related memory, and Ranked retrieval APIs
 
 ✓ Graph traversal
 
-✓ FastAPI cognitive API
+✓ Robust Embedding retrieval layer (Phase 5)
 
-✓ Modular architecture
+✓ Hybrid graph + vector search orchestration (Phase 5)
 
----
+✓ Semantic ranking & Memory activation thresholds (Phase 5)
 
-# What Makes Neural Divergent Different
+What Makes Neural Divergent Different
 
-Most memory systems
+Most AI memory systems:
 
-Conversation
+Conversation ↓ Embedding ↓ Vector Search ↓ LLM
 
-↓
+Neural Divergent:
 
-Embedding
+Conversation ↓ Grammar ↓ Cognitive Semantics ↓ Pruning ↓ Importance ↓ Memory Decisions ↓ Graph ↓ Retrieval ↓ LLM
 
-↓
+The architecture actively filters noise, standardizes concepts, and reasons about data structure before embedding or involving an LLM.
 
-Vector Search
+Next up Roadmap
 
-↓
+Neural Divergent 6
 
-LLM
+True Knowledge Graph backend (Neo4j or Memgraph)
 
-Neural Divergent
+Relationship traversal optimizations
 
-Conversation
+Multi-hop deterministic reasoning
 
-↓
-
-Grammar
-
-↓
-
-Semantics
-
-↓
-
-Importance
-
-↓
-
-Memory Decisions
-
-↓
-
-Graph
-
-↓
-
-Retrieval
-
-↓
-
-LLM
-
-The architecture attempts to reason before embedding.
-
----
-
-# Next up Roadmap
-
-## Neural Divergent 5
-
-Embedding retrieval layer
-
-Hybrid graph + vector search
-
-Semantic ranking
-
-Memory activation
-
----
-
-## Neural Divergent 6
-
-Knowledge graph backend
-
-Neo4j
-
-or
-
-Memgraph
-
-Relationship traversal
-
-Multi-hop reasoning
-
----
-
-## Neural Divergent 7
+Neural Divergent 7
 
 Context builder
 
 Automatic prompt assembly
 
-Token optimization
+Token optimization & Memory compression
 
-Memory compression
-
----
-
-## Neural Divergent 8
+Neural Divergent 8
 
 Cognitive planner
 
@@ -751,50 +395,10 @@ Goal management
 
 Task decomposition
 
-Self-updating memory
+Self-updating memory and Reasoning chains
 
-Reasoning chains
+Long-Term Vision
 
----
+The final architecture aims to resemble a simplified cognitive system. Rather than treating memory as raw text blobs, Neural Divergent treats memory as highly-structured, refined, and categorized knowledge.
 
-# Long-Term Vision
-
-The final architecture aims to resemble a simplified cognitive system.
-
-Conversation
-
-↓
-
-Understanding
-
-↓
-
-Semantic Memory
-
-↓
-
-Importance
-
-↓
-
-Memory Formation
-
-↓
-
-Knowledge Graph
-
-↓
-
-Retrieval
-
-↓
-
-Reasoning
-
-↓
-
-Response Generation
-
-Rather than treating memory as text, Neural Divergent treats memory as structured knowledge.
-
-The project ultimately aims to become a deterministic cognitive layer capable of sitting in front of any modern Large Language Model.
+The project ultimately aims to become a fast, deterministic cognitive layer capable of sitting in front of any modern Large Language Model, granting it long-term, explainable, and evolving memory without context-window exhaustion.
