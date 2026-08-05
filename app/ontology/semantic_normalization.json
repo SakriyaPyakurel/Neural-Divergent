@@ -1,296 +1,111 @@
 {
-"subjects": {
-"i": "user",
-"me": "user",
-"my": "user",
-"myself": "user"
-},
-
-"predicates": {
-"grow": [
-{
-"contains": ["neighborhood", "city", "town", "village", "up in"],
-"predicate": "childhood_environment"
-}
-],
-"consider": [
-{
-"contains": ["hometown"],
-"predicate": "hometown"
-}
-],
-"learn": [
-{
-"contains": ["swim", "swimming"],
-"predicate": "skill",
-"object": "swimming"
-},
-{
-"contains": ["ride a bicycle", "ride bicycle", "bicycle"],
-"predicate": "skill",
-"object": "cycling"
-},
-{
-"contains": ["count"],
-"predicate": "skill",
-"object": "counting"
-},
-{
-"contains": ["alphabet"],
-"predicate": "skill",
-"object": "alphabet"
-},
-{
-"contains": ["arithmetic"],
-"predicate": "skill",
-"object": "arithmetic"
-}
-],
-"become": [
-{
-"contains": ["interested"],
-"predicate": "interest"
-},
-{
-"contains": ["fascinated"],
-"predicate": "interest"
-},
-{
-"contains": ["curious"],
-"predicate": "trait",
-"object": "curious"
-},
-{
-"contains": ["confident"],
-"predicate": "trait",
-"object": "confident"
-}
-],
-"enjoy": [
-{
-"contains": ["exploring", "explore", "places", "travel"],
-"predicate": "exploration"
-},
-{
-"contains": ["reading"],
-"predicate": "hobby",
-"object": "reading"
-},
-{
-"contains": ["drawing"],
-"predicate": "hobby",
-"object": "drawing"
-},
-{
-"contains": ["lego"],
-"predicate": "hobby",
-"object": "lego"
-},
-{
-"contains": ["soccer"],
-"predicate": "hobby",
-"object": "soccer"
-},
-{
-"contains": ["cycling"],
-"predicate": "hobby",
-"object": "cycling"
-},
-{
-"contains": ["helping"],
-"predicate": "trait",
-"object": "helpful"
-}
-],
-"love": [
-{
-"contains": ["dogs"],
-"predicate": "like",
-"object": "dogs"
-},
-{
-"contains": ["cats"],
-"predicate": "like",
-"object": "cats"
-},
-{
-"contains": ["python"],
-"predicate": "favorite_programming_language",
-"object": "Python"
-}
-],
-"work": [
-{
-"contains": ["architect"],
-"predicate": "primary_category",
-"object": "architecture"
-},
-{
-"contains": ["teacher"],
-"predicate": "primary_category",
-"object": "education"
-},
-{
-"contains": ["engineer"],
-"predicate": "primary_category",
-"object": "engineering"
-}
-],
-"live": [
-{
-"contains": [],
-"predicate": "childhood_environment"
-}
-],
-"spend": [
-{
-"contains": ["childhood"],
-"predicate": "childhood_environment"
-},
-{
-"contains": ["time", "weekend", "vacation", "hours"],
-"predicate": "habit"
-}
-],
-"am": [
-{
-"contains": ["youngest", "oldest", "middle"],
-"predicate": "birth_order"
-},
-{
-"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
-"predicate": "trait"
-},
-{
-"contains": ["years old", "yo"],
-"predicate": "age"
-}
-],
-"is": [
-{
-"contains": ["youngest", "oldest", "middle"],
-"predicate": "birth_order"
-},
-{
-"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
-"predicate": "trait"
-}
-],
-"was": [
-{
-"contains": ["youngest", "oldest", "middle"],
-"predicate": "birth_order"
-},
-{
-"contains": ["curious", "creative", "patient", "detail-oriented", "resilient"],
-"predicate": "trait"
-}
-],
-"take": [
-{
-"contains": ["apart", "disassemble", "toys", "machines"],
-"predicate": "habit",
-"object": "disassembling_objects"
-}
-],
-"ask": [
-{
-"contains": ["questions", "why", "how"],
-"predicate": "trait",
-"object": "inquisitive"
-}
-],
-"start": [
-{
-"contains": ["learning", "studying"],
-"predicate": "learn"
-},
-{
-"contains": ["working", "building"],
-"predicate": "working_on"
-}
-],
-"read": [
-{
-"contains": [],
-"predicate": "habit"
-}
-]
-},
-
-"objects": {
-"to swim": "swimming",
-"ride a bicycle": "cycling",
-"ride bicycle": "cycling",
-"interested in science": "science",
-"fascinated by birds": "birds",
-"building lego": "lego",
-"lego bricks": "lego",
-"large box of lego bricks": "lego",
-"nature documentaries": "nature",
-"children's books": "books",
-"picture books": "books",
-"educational software": "software",
-"desktop computer": "computer",
-"most of my childhood in ": "",
-"my childhood in ": "",
-"the youngest child in my family": "youngest_child",
-"the youngest child": "youngest_child",
-"the oldest child in my family": "oldest_child",
-"the oldest child": "oldest_child",
-"the middle child in my family": "middle_child",
-"the middle child": "middle_child",
-"from my mistakes": "learning_from_mistakes"
-},
-
-"phrase_patterns": [
-{
-"contains": "learn from my mistakes",
-"predicate": "trait",
-"object": "resilient"
-},
-{
-"contains": "how things worked",
-"predicate": "like",
-"object": "engineering"
-},
-{
-"contains": "how machines worked",
-"predicate": "like",
-"object": "engineering"
-},
-{
-"contains": "how computers worked",
-"predicate": "like",
-"object": "computer science"
-},
-{
-"contains": "bedtime stories",
-"predicate": "habit",
-"object": "reading"
-},
-{
-"contains": "school holidays",
-"predicate": "habit"
-},
-{
-"contains": "every weekend",
-"predicate": "habit"
-}
-],
-
-"canonical_objects": {
-"lego": "Lego",
-"python": "Python",
-"rust": "Rust",
-"javascript": "JavaScript",
-"html": "HTML",
-"css": "CSS",
-"mysql": "MySQL",
-"fastapi": "FastAPI",
-"spacy": "spaCy",
-"sqlite": "SQLite",
-"sqlite-vec": "sqlite-vec",
-"sentence-transformers": "SentenceTransformers"
-}
+  "subjects": {
+    "i": "user",
+    "me": "user",
+    "my": "user",
+    "myself": "user",
+    "mine": "user",
+    "another habit of mine": "user",
+    "one of my habits": "user",
+    "we": "user_team"
+  },
+  "predicates": {
+    "not_am": [
+      { "contains": ["allergic"], "predicate": "not_allergic_to" }
+    ],
+    "not_is": [
+      { "contains": ["allergic"], "predicate": "not_allergic_to" }
+    ],
+    "am": [
+      { "contains": ["not allergic"], "predicate": "not_allergic_to" },
+      { "contains": ["years old", "yo", "age"], "predicate": "age" },
+      { "contains": ["allergic"], "predicate": "allergic_to" },
+      { "contains": ["interested"], "predicate": "interest" },
+      { "contains": ["working"], "predicate": "working_on" },
+      { "contains": ["managing"], "predicate": "managing" },
+      { "contains": ["operating"], "predicate": "operate" },
+      { "contains": ["analyzing"], "predicate": "analyzing" },
+      { "contains": ["debugging"], "predicate": "debugging" },
+      { "contains": ["wireframing"], "predicate": "wireframe" },
+      { "contains": ["designing"], "predicate": "designing" },
+      { "contains": ["extracting"], "predicate": "extract" }
+    ],
+    "is": [
+      { "contains": ["not allergic"], "predicate": "not_allergic_to" },
+      { "contains": ["years old", "yo", "age"], "predicate": "age" },
+      { "contains": ["allergic"], "predicate": "allergic_to" },
+      { "contains": ["preferred name", "name"], "predicate": "name" },
+      { "contains": ["nationality"], "predicate": "nationality" },
+      { "contains": ["primary business"], "predicate": "primary_business" }
+    ],
+    "grow": [
+      { "contains": ["up in", "in"], "predicate": "childhood_environment" }
+    ],
+    "grew": [
+      { "contains": ["up in", "in"], "predicate": "childhood_environment" }
+    ],
+    "work": [
+      { "contains": ["on"], "predicate": "working_on" }
+    ],
+    "spend": [
+      { "contains": ["childhood"], "predicate": "childhood_environment" },
+      { "contains": ["time", "weekend", "weekends", "vacation"], "predicate": "habit" }
+    ],
+    "plan": [
+      { "contains": ["to"], "predicate": "plan" }
+    ]
+  },
+  "objects": {
+    "not allergic to ": "",
+    "not allergic ": "",
+    "highly allergic to ": "",
+    "highly allergic ": "",
+    "allergic to ": "",
+    "allergic ": "",
+    "highly ": "",
+    "in kathmandu , nepal": "Kathmandu, Nepal",
+    "in kathmandu, nepal": "Kathmandu, Nepal",
+    "years old": "",
+    "years old now": ""
+  },
+  "phrase_patterns": [
+    {
+      "contains": "not allergic",
+      "predicate": "not_allergic_to"
+    },
+    {
+      "contains": "years old",
+      "predicate": "age"
+    },
+    {
+      "contains": "allergic to",
+      "predicate": "allergic_to"
+    },
+    {
+      "contains": "learn from my mistakes",
+      "predicate": "trait",
+      "object": "resilient"
+    },
+    {
+      "contains": "lego",
+      "predicate": "hobby",
+      "object": "Lego"
+    },
+    {
+      "contains": "how things worked",
+      "predicate": "like",
+      "object": "engineering"
+    }
+  ],
+  "canonical_objects": {
+    "python": "Python",
+    "rust": "Rust",
+    "java": "Java",
+    "docker": "Docker",
+    "neo4j": "Neo4j",
+    "fastapi": "FastAPI",
+    "nepal": "Nepal",
+    "kathmandu": "Kathmandu",
+    "google analytics": "Google Analytics"
+  }
 }

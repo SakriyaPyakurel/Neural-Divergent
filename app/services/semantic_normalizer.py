@@ -71,29 +71,36 @@ class SemanticNormalizer:
         verb = candidate.get("predicate", "").lower().strip()
         obj = candidate.get("object", "").lower().strip()
         
-        # 1. Check Phrase Patterns first (Highest context specificity)
+        resolved = False
+        
+        # Checking Phrase Patterns first (Highest context specificity)
         for pattern in self.phrase_patterns:
             target = pattern.get("contains", "").lower()
             if target in obj or target in verb:
                 candidate["predicate"] = pattern.get("predicate", candidate["predicate"])
                 if "object" in pattern:
                     candidate["object"] = pattern["object"]
-                return candidate
+                resolved = True
+                break
                 
-        # Checking specific Predicate rules
-        if verb in self.predicates:
+        # Checking specific Predicate rules if not already resolved
+        if not resolved and verb in self.predicates:
             rules = self.predicates[verb]
             for rule in rules:
                 contains_list = rule.get("contains", [])
-                
-                # If contains_list is empty, it's a catch-all (like "live"). 
-                # Otherwise, check if ANY of the keywords are in the object.
                 if not contains_list or any(c in obj for c in contains_list):
                     candidate["predicate"] = rule.get("predicate", candidate["predicate"])
                     if "object" in rule:
                         candidate["object"] = rule["object"]
+                    resolved = True
                     break 
                     
+        # GLOBAL NEGATION CHECK (Run after resolution, before returning)
+        if candidate.get("is_negated", False):
+            current_pred = candidate.get("predicate", "")
+            if current_pred and not current_pred.startswith("not_"):
+                candidate["predicate"] = f"not_{current_pred}"
+
         return candidate
 
     def _clean_object_noise(self, candidate: Dict[str, Any]) -> Dict[str, Any]:
