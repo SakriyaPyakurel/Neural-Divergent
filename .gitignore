@@ -1,5 +1,5 @@
 venv/
 __pycache__/
 *.db 
-seed_data_sam/
+tester_seeds/
 *.txt

@@ -77,11 +77,15 @@ class LocalExtractionEngine:
                 obj = ""
                 for child in token.children:
                     if child.dep_ in ["attr","acomp"]:
+                        if any(sub.dep_ == "neg" for sub in child.children):
+                            is_negated = True
                         raw_obj = " ".join([t.text for t in child.subtree if t.i not in exclude_ids])
                         obj = raw_obj.replace(" - ", "-")
                         break
                 
                 if subject and obj:
+                    if is_negated and not obj.startswith("not "):
+                        obj = f"not {obj}"
                     relationships.append(CandidateRelationship(
                         subject=subject,
                         verb="is",
