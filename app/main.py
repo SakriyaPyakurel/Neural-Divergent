@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager 
 import logging 
 from pathlib import Path
+import os
 
 # Importing services 
 from app.services.database import MemoryDatabase 
@@ -13,9 +14,12 @@ from app.services.orchestrator import NeuralDivergentOrchestrator
 from app.services.decay_engine import CognitiveDecayEngine
 from app.services.embedding_engine import EmbeddingEngine
 from app.services.semantic_normalizer import SemanticNormalizer
+from app.services.graph_manager import GraphManager 
+from app.services.graph_ingester import GraphIngester
 
 # importing routers
 from app.routers.memory import memory_router
+from app.routers.graph import graph_router
 
 # logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +29,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app:FastAPI):
     """Application lifecycle manager of Neural Divergent.""" 
     logging.info("Booting up Neural Divergent Cognitive Engine...") 
+    graph_manager = None 
+    decay_engine = None
     try:
        # Initializing the database from the file 
        db_file = Path("db.txt")
@@ -37,6 +43,19 @@ async def lifespan(app:FastAPI):
 
        ONTOLOGY_PATH = "app/ontology/predicate_ontology.json"
        SEMANTIC_PATH = "app/ontology/semantic_normalization.json"
+
+       # Initializing Graph Database Service(Neo4j)
+       NEO4J_URL = os.getenv("NEO4J_URL", "bolt://localhost:7687")
+       NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
+       NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+
+       graph_manager = GraphManager(url=NEO4J_URL, user=NEO4J_USER, password=NEO4J_PASSWORD)
+       graph_manager.connect()
+       graph_ingester = GraphIngester(graph_manager=graph_manager, ontology_path=ONTOLOGY_PATH)
+
+       app.state.graph_manager = graph_manager 
+       app.state.graph_ingester = graph_ingester
+
        # loading dependencies(Ontology,Estimator,Decision Engine,Extractor,semantic classifier)
        registry = OntologyLoader.get_registry(ONTOLOGY_PATH) 
        importance_estimator = ImportanceEstimator(ontology_path=ONTOLOGY_PATH)
@@ -53,7 +72,8 @@ async def lifespan(app:FastAPI):
         importance_estimator=importance_estimator,
         decision_engine=decision_engine,
         embedder=embedder,
-        normalizer=normalizer
+        normalizer=normalizer,
+        graph_ingester=graph_ingester
         )
        app.state.embedder = embedder
        app.state.orchestrator = orchestrator
@@ -63,7 +83,7 @@ async def lifespan(app:FastAPI):
        decay_engine = CognitiveDecayEngine(db=db,check_interval_seconds=3600,decay_threshold=0.12)
        await decay_engine.start()
        app.state.decay_engine = decay_engine
-       logger.info("Neural Divergent initialized successfully.")
+       logger.info("Neural Divergent initialized successfully with Graph layer.")
        yield 
     except Exception as e:
        logger.exception(f"Failed to initialize Neural Divergent: {e}")
@@ -72,14 +92,17 @@ async def lifespan(app:FastAPI):
        logger.info("Shutting down Neural Divergent.") 
        if decay_engine is not None:
           await decay_engine.stop()
+       if graph_manager is not None:
+          graph_manager.close()
 
 app = FastAPI(title="Neural-Divergent API",
               description="The Cognitive orchestrator and memory decision engine.",
-              version="1.0.0",
+              version="0.6.0",
               lifespan=lifespan)
 
 # including the routers
 app.include_router(memory_router)
+app.include_router(graph_router)
 
 @app.get("/",tags=["System"]) 
 async def root():
