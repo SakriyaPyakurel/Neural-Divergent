@@ -9,8 +9,10 @@ from app.services.importance_engine import ImportanceEstimator,RetentionPolicy,O
 from app.services.decision_engine import MemoryDecisionEngine
 from app.services.embedding_engine import EmbeddingEngine
 from app.services.semantic_normalizer import SemanticNormalizer
+from app.services.graph_ingester import GraphIngester
 from app.services.memory_refiner import  MemoryRefiner
 from app.models.memory import MemoryCategory
+from app.models.schemas import MemoryAction
 
 logger = logging.getLogger('NeuralDivergent.Orchestrator')
 
@@ -26,6 +28,8 @@ class MemoryProcessingResult:
    retention_policy: str = "EPHEMERAL"
    reason:Optional[str] = None
    confidence: float = 1.0
+   graph_synced: bool = False 
+   graph_metadata:Optional[Dict[str,Any]] = None
 
    def to_dict(self) -> Dict[str, Any]:
         """Converts the dataclass to the exact dictionary format the FastAPI router expects."""
@@ -40,7 +44,9 @@ class MemoryProcessingResult:
             "importance_prior": self.importance_prior,
             "retention_policy": self.retention_policy,
             "reason":self.reason,
-            "confidence":self.confidence
+            "confidence":self.confidence,
+            "graph_synced":self.graph_synced,
+            "graph_metadata":self.graph_metadata
         }
 
 class NeuralDivergentOrchestrator:
@@ -54,7 +60,9 @@ class NeuralDivergentOrchestrator:
                 decision_engine: MemoryDecisionEngine,
                 embedder:EmbeddingEngine,
                 normalizer:SemanticNormalizer,
-                ontology_path:str = "app/ontology/predicate_ontology.json"):
+                graph_ingester:GraphIngester,
+                ontology_path:str = "app/ontology/predicate_ontology.json"
+                ):
       """Utilizes the tools handed to it rather than creating them."""
       logger.info("Initializing Neural Divergent Cognitive Pipeline...")
       self.extractor = extractor
@@ -63,6 +71,7 @@ class NeuralDivergentOrchestrator:
       self.decision_engine = decision_engine 
       self.embedding_engine = embedder
       self.normalizer = normalizer
+      self.graph_ingester = graph_ingester
       self.refiner = MemoryRefiner()
 
       # Loading the shared declerative ontology to map categories on the fly 
@@ -135,7 +144,7 @@ class NeuralDivergentOrchestrator:
             classification_confidence = cached_confidence 
             logger.info(f"Fallback invoked for predicate '{sir.relationship} : {memory_category}'") 
          
-         # Inject evaluated categorical types directly into SIRs
+         # Injecting evaluated categorical types directly into SIRs
          sir.event_type = event_type
          metadata_payload = sir.metadata.copy() if sir.metadata else {} 
          metadata_payload["classification_confidence"] = classification_confidence
@@ -171,10 +180,42 @@ class NeuralDivergentOrchestrator:
             metadata=metadata_payload,
             vector_embedding=vector_embeddings
          )
+         # GRAPH INGESTION LAYER
+         # Pushing to Neo4j only if the Decision Engine created or altered the memory
+         valid_graph_actions = [
+                MemoryAction.NEW.value, 
+                MemoryAction.REINFORCED.value, 
+                MemoryAction.SUPERSEDED.value
+            ]
+
+         graph_synced = False 
+         graph_metadata = None 
+
+         if action in valid_graph_actions:
+            try:
+               graph_result = self.graph_ingester.ingest_memory(
+                        subject=sir.subject,
+                        predicate=sir.relationship,
+                        object_val=sir.object,
+                        memory_category=memory_category.value,
+                        importance_score=importance_score,
+                        memory_id=memory_id,
+                        metadata=metadata_payload
+                    )
+               if graph_result:
+                  graph_synced = True 
+                  graph_metadata = graph_result.get("rel_data", {})
+                  logger.info(f"Graph synchronized for memory_id {memory_id}. Edge Count: {graph_metadata.get('reinforcement_count', 1)}")
+            except Exception as e:
+               logger.error(f"Failed to ingest memory {memory_id} into Graph: {e}")
+         else:
+            logger.debug(f"Skipping graph ingestion for memory_id {memory_id} (Action: {action}).")
 
          result = MemoryProcessingResult(sir.subject,predicate=sir.relationship,object_val=sir.object,
                                                       action=action,memory_id=memory_id,importance_prior=importance_score,retention_policy=retention_policy,
-                                                      reason=sir.reason,confidence=sir.confidence)
+                                                      reason=sir.reason,confidence=sir.confidence,
+                                                      graph_synced=graph_synced,
+                                                      graph_metadata=graph_metadata)
          results_ledger.append(result.to_dict())
          
       return results_ledger
