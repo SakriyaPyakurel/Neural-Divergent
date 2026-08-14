@@ -1,5 +1,5 @@
 from pydantic import BaseModel,Field
-from typing import List,Optional
+from typing import List,Optional,Dict,Any
 from datetime import datetime,timezone
 from enum import Enum
 
@@ -52,3 +52,15 @@ class CognitiveIngestResponse(BaseModel):
         description="ISO 8601 UTC timestamp of processing."
     )
     results: List[ProcessedTripleResponse]
+
+# Context Compressor related Schemas 
+class CompressionRequest(BaseModel):
+    query:str = Field(...,description="The string input for the context compressor.")
+    target_entities:List[str] 
+    raw_history:str 
+    max_hops:int=2 
+    limit:int=50 
+
+class CompressionResponse(BaseModel):
+    compressed_context: str
+    metrics: Dict[str, Any]

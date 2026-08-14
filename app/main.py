@@ -20,6 +20,7 @@ from app.services.graph_ingester import GraphIngester
 # importing routers
 from app.routers.memory import memory_router
 from app.routers.graph import graph_router
+from app.routers.cognitive import cognitive_router
 
 # logging
 logging.basicConfig(level=logging.INFO)
@@ -96,13 +97,14 @@ async def lifespan(app:FastAPI):
           graph_manager.close()
 
 app = FastAPI(title="Neural-Divergent API",
-              description="The Cognitive orchestrator and memory decision engine.",
-              version="0.6.0",
+              description="The Cognitive orchestrator and memory decision engine with context compression engine.",
+              version="0.7.0",
               lifespan=lifespan)
 
 # including the routers
 app.include_router(memory_router)
 app.include_router(graph_router)
+app.include_router(cognitive_router)
 
 @app.get("/",tags=["System"]) 
 async def root():
