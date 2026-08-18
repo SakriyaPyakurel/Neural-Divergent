@@ -49,7 +49,7 @@ async def ingest_information(
         
 
 @memory_router.get("/active",response_model=List[Dict[str,Any]])
-async def get_active_truth(request:Request, subject: str = Query(...,example="user"),predicate: str= Query(...,example="primary_category")):
+async def get_active_truth(request:Request, subject: str = Query(...,examples="user"),predicate: str= Query(...,examples="primary_category")):
     """
     Queries the current state of truth (active memories) for a subject-predicate relation.
     Example: Find what the user's active programming language is.
