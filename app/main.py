@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager 
 import logging 
 from pathlib import Path
+from dotenv import load_dotenv
 import os
 
 # Importing services 
@@ -25,6 +26,7 @@ from app.routers.cognitive import cognitive_router
 # logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__) 
+load_dotenv()
 
 @asynccontextmanager
 async def lifespan(app:FastAPI):
@@ -46,9 +48,9 @@ async def lifespan(app:FastAPI):
        SEMANTIC_PATH = "app/ontology/semantic_normalization.json"
 
        # Initializing Graph Database Service(Neo4j)
-       NEO4J_URL = os.getenv("NEO4J_URL", "bolt://localhost:7687")
+       NEO4J_URL = os.getenv("NEO4J_URL", "bolt://127.0.0.1:7687")
        NEO4J_USER = os.getenv("NEO4J_USER", "neo4j")
-       NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password")
+       NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD", "password123")
 
        graph_manager = GraphManager(url=NEO4J_URL, user=NEO4J_USER, password=NEO4J_PASSWORD)
        graph_manager.connect()
