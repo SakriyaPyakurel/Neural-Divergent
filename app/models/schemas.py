@@ -64,3 +64,8 @@ class CompressionRequest(BaseModel):
 class CompressionResponse(BaseModel):
     compressed_context: str
     metrics: Dict[str, Any]
+
+# Chat Request Schema 
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
