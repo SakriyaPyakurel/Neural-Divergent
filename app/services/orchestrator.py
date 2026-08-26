@@ -100,6 +100,8 @@ class NeuralDivergentOrchestrator:
       # Processing each extracted structural triple 
       normalized_candidates = []
       for sir in sirs:
+         if active_contexts and sir.subject.strip().lower() in ["i", "me", "my", "user", "myself"]:
+            sir.subject = active_contexts[0]
          # Converting raw syntax into cannonical cognitive concepts
          raw_candidate = {
              "subject": sir.subject,
