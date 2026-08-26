@@ -11,23 +11,6 @@ class MemoryCategory(str, Enum):
     KNOWLEDGE = "knowledge"
     EXPERIENCE = "experience"
 
-class MemoryContext(BaseModel):
-    reason:Optional[str] =None 
-    time:Optional[str] = None 
-    domain:Optional[str] = None
-
-class Memory(BaseModel):
-    id : str = Field(default_factory=lambda:str(uuid4())) 
-    fact:str 
-    context:MemoryContext 
-    primary_category:MemoryCategory
-    secondary_categories:List[MemoryCategory] = [] 
-    importance_score: float = Field(
-        ge=0.0,
-        le=1.0
-    )
-    timestamp: datetime = Field(default_factory= lambda: datetime.now(UTC)) 
-    related_memories: List[str] = []
 
 class CandidateRelationship(BaseModel):
     # An intermediate and pure structural representation of a sentence before being categorized 

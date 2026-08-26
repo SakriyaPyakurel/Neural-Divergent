@@ -1,4 +1,4 @@
-from fastapi import FastAPI,Request
+from fastapi import FastAPI,Request,BackgroundTasks
 from contextlib import asynccontextmanager 
 import logging 
 from pathlib import Path
@@ -72,7 +72,7 @@ async def lifespan(app:FastAPI):
        app.state.retrieval_planner = retrieval_planner
 
        # Initializing the Async LLM Client
-       app.state.llm_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+       app.state.llm_client = AsyncOpenAI(api_key=os.getenv("GROQ_API_KEY"),base_url="https://api.groq.com/openai/v1")
 
        # loading dependencies(Ontology,Estimator,Decision Engine,Extractor,semantic classifier)
        registry = OntologyLoader.get_registry(ONTOLOGY_PATH) 
@@ -118,6 +118,17 @@ app = FastAPI(title="Neural-Divergent API",
               version="0.7.0",
               lifespan=lifespan)
 
+async def process_deductions_background(user_id: str, message_text: str, orchestrator):
+    try:
+        logger.info(f"[Background Task] Extracting knowledge triples for {user_id}...")
+        results = orchestrator.process_utterance(
+            text=message_text,
+            active_contexts=[user_id]
+        )
+        logger.info(f"[Background Task] Processed {len(results)} memory entries into Graph Memory.")
+    except Exception as e:
+        logger.error(f"[Background Task Failed] Error processing deductions: {e}")
+
 # including the routers
 app.include_router(memory_router)
 app.include_router(graph_router)
@@ -133,7 +144,7 @@ async def root():
     }
 
 @app.post("/api/v1/chat") 
-async def chat_endpoint(request:ChatRequest,fastapi_req:Request):
+async def chat_endpoint(request:ChatRequest,fastapi_req:Request,background_tasks:BackgroundTasks):
    """
    Main entry point for conversational interaction. 
    Routes queries, pulls graph context, and constructs the LLM payload.
@@ -142,6 +153,7 @@ async def chat_endpoint(request:ChatRequest,fastapi_req:Request):
    planner: RetrievalPlanner = fastapi_req.app.state.retrieval_planner
    llm_client: AsyncOpenAI = fastapi_req.app.state.llm_client
    graph_manager: GraphManager = fastapi_req.app.state.graph_manager
+   orchestrator : NeuralDivergentOrchestrator = fastapi_req.app.state.orchestrator
 
    # Logging incoming user turn to Neo4j sequential chain
    user_msg_id = f"msg_{uuid.uuid4().hex[:12]}"
@@ -167,17 +179,12 @@ async def chat_endpoint(request:ChatRequest,fastapi_req:Request):
     === USER CONTEXT (GRAPH RETRIEVAL) ===
     {memory_context}
     ======================================
-    
-    Instructions:
-    1. Answer the user's message naturally.
-    2. Do NOT mention the graph database, Cypher, or nodes directly. 
-    3. Treat the context above as organic facts you remember about the user.
     """
 
    try:
       # Executing the Async LLM call 
       response = await llm_client.chat.completions.create(
-            model="gpt-4o-mini", # Using a fast/cheap model for standard chat
+            model="openai/gpt-oss-20b", # Using a fast/cheap model for standard chat
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": request.message}
@@ -196,11 +203,20 @@ async def chat_endpoint(request:ChatRequest,fastapi_req:Request):
             text=final_answer
         )
 
+      # Queue background extraction & graph learning via process_utterance
+      background_tasks.add_task(
+            process_deductions_background,
+            user_id=request.user_id,
+            message_text=request.message,
+            orchestrator=orchestrator
+        )
+
       return {
             "status": "success",
             "route_taken": route_type,
             "response": final_answer,
-            "messages_recorded": [user_msg_id, ai_msg_id]
+            "messages_recorded": [user_msg_id, ai_msg_id],
+            "background_learning_queued": True
         }
    except Exception as e:
         logger.error(f"LLM Generation Failed: {e}")

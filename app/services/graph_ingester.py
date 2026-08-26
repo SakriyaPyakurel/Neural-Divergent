@@ -59,10 +59,13 @@ class GraphIngester:
 
         # Serializing metadata to a JSON string for safe graph storage
         metadata_str = json.dumps(metadata) if metadata else "{}"
-
+        if subject.startswith("test_user") or subject == "user" or (metadata and metadata.get("user_id") == subject):
+            subject_merge_cypher = "MERGE (s:User {user_id: $subject})"
+        else:
+            subject_merge_cypher = "MERGE (s:Subject {name: $subject})"
         query = f"""
         // Finding or creating the Nodes
-        MERGE (s:Subject {{name: $subject}})
+        {subject_merge_cypher}
         MERGE (o:Concept {{name: $object}})
         
         {supersession_cypher}
