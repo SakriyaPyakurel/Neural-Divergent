@@ -59,7 +59,7 @@ class GraphIngester:
 
         # Serializing metadata to a JSON string for safe graph storage
         metadata_str = json.dumps(metadata) if metadata else "{}"
-        if subject.startswith("test_user") or subject == "user" or (metadata and metadata.get("user_id") == subject):
+        if subject.startswith("test_user") or subject.startswith("user") or subject == "user" or (metadata and metadata.get("user_id") == subject):
             subject_merge_cypher = "MERGE (s:User {user_id: $subject})"
         else:
             subject_merge_cypher = "MERGE (s:Subject {name: $subject})"
