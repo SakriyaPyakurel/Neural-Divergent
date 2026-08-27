@@ -108,6 +108,9 @@ class LocalExtractionEngine:
                 # Skip infinitive modifier verbs
                 if any(c.text.lower() == "to" and c.dep_ == "aux" for c in token.children):
                     continue
+                # Skipping nested/complement verb
+                if token.dep_ in ["xcomp", "ccomp", "advcl"] and token.head.pos_ == "VERB":
+                    continue
                 # Detecting negation 
                 is_negated = any(child.dep_ == "neg" for child in token.children)
 
