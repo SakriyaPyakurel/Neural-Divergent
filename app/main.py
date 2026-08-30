@@ -1,4 +1,5 @@
-from fastapi import FastAPI,Request,BackgroundTasks
+from fastapi import FastAPI,Request,BackgroundTasks,Depends
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager 
 import logging 
 from pathlib import Path
@@ -11,6 +12,7 @@ from openai import AsyncOpenAI
 
 # Importing services 
 from app.services.database import MemoryDatabase 
+from app.core.security import verify_api_key
 from app.services.importance_engine import OntologyLoader,ImportanceEstimator 
 from app.services.decision_engine import MemoryDecisionEngine
 from app.services.extractor import LocalExtractionEngine 
@@ -118,6 +120,14 @@ app = FastAPI(title="Neural-Divergent API",
               version="0.7.0",
               lifespan=lifespan)
 
+# Accessibility Layer: CORS Setup
+app.add_middleware(
+   CORSMiddleware,
+   allow_origins=["*"],
+   allow_credentials=True,
+   allow_methods=["*"],
+   allow_headers=["*"])
+
 async def process_deductions_background(user_id: str, message_text: str, orchestrator):
     try:
         logger.info(f"[Background Task] Extracting knowledge triples for {user_id}...")
@@ -143,7 +153,7 @@ async def root():
         "ready":True
     }
 
-@app.post("/api/v1/chat") 
+@app.post("/api/v1/chat",dependencies=Depends(verify_api_key)) 
 async def chat_endpoint(request:ChatRequest,fastapi_req:Request,background_tasks:BackgroundTasks):
    """
    Main entry point for conversational interaction. 

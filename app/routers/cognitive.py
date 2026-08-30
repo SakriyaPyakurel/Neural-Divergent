@@ -1,5 +1,6 @@
-from fastapi import APIRouter,Request,HTTPException 
+from fastapi import APIRouter,Request,HTTPException,Depends
 import logging
+from app.core.security import verify_api_key
 from app.models.schemas import CompressionRequest,CompressionResponse
 from app.services.context_compressor import ContextCompressor 
 
@@ -7,7 +8,8 @@ logger = logging.getLogger("NeuralDivergent.CognitiveRouter")
 
 cognitive_router = APIRouter(
     prefix="/cognitive",
-    tags=["Cognitive Context"]
+    tags=["Cognitive Context"],
+    dependencies=[Depends(verify_api_key)]
 )
 
 @cognitive_router.post('/compress',response_model=CompressionResponse) 
