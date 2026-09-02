@@ -31,6 +31,7 @@ from app.models.schemas import ChatRequest
 from app.routers.memory import memory_router
 from app.routers.graph import graph_router
 from app.routers.cognitive import cognitive_router
+from app.routers.goals import goals_router
 
 # logging
 logging.basicConfig(level=logging.INFO)
@@ -143,6 +144,7 @@ async def process_deductions_background(user_id: str, message_text: str, orchest
 app.include_router(memory_router)
 app.include_router(graph_router)
 app.include_router(cognitive_router)
+app.include_router(goals_router)
 
 @app.get("/",tags=["System"]) 
 async def root():
@@ -231,6 +233,7 @@ async def chat_endpoint(request:ChatRequest,fastapi_req:Request,background_tasks
    except Exception as e:
         logger.error(f"LLM Generation Failed: {e}")
         return {"status": "error", "message": "Failed to generate cognitive response."}
+
 
    
    
