@@ -1,5 +1,5 @@
 from fastapi import APIRouter,HTTPException,Request,Depends
-from app.core.security import verify_api_key
+from app.core.security import verify_nd_api_key
 import logging
 
 logger = logging.getLogger("NeuralDivergent.GraphRouter")
@@ -8,7 +8,7 @@ logger = logging.getLogger("NeuralDivergent.GraphRouter")
 graph_router = APIRouter(
     prefix="/api/v1/graph",
     tags=["Cognitive Memory Graph"],
-    dependencies=[Depends(verify_api_key)]
+    dependencies=[Depends(verify_nd_api_key)]
 )
 
 @graph_router.get("/stats")
