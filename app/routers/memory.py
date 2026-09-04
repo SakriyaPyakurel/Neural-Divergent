@@ -1,6 +1,6 @@
 from fastapi import APIRouter,Request,HTTPException,Query,Depends
 from typing import List,Dict,Any
-from app.core.security import verify_api_key
+from app.core.security import verify_nd_api_key
 from app.models.schemas import IngestRequest,CognitiveIngestResponse
 from app.core.security import verify_api_key 
 
@@ -11,7 +11,7 @@ logger = logging.getLogger('NeuralDivergent.memory_router')
 memory_router = APIRouter(
     prefix="/api/v1/memory",
     tags = ["Cognitive Memory Engine"],
-    dependencies=Depends(verify_api_key)
+    dependencies=Depends(verify_nd_api_key)
 )
 
 @memory_router.post("/ingest", response_model=CognitiveIngestResponse)

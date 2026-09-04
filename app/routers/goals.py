@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 import urllib.parse
 
-from app.core.security import verify_api_key
+from app.core.security import verify_nd_api_key
 from app.models.goal_schemas import (
     GoalCreateRequest, 
     GoalResponse, 
@@ -14,7 +14,7 @@ from app.services.goal_planner import GoalPlanner
 goals_router = APIRouter(
     prefix="/api/v1/goals",
     tags=["Cognitive Goals"],
-    dependencies=[Depends(verify_api_key)]
+    dependencies=[Depends(verify_nd_api_key)]
 )
 
 def get_planner(request: Request) -> GoalPlanner:
