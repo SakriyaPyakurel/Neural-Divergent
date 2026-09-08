@@ -67,6 +67,15 @@ class CompressionResponse(BaseModel):
 
 # Chat Request Schema 
 class ChatRequest(BaseModel):
-    user_id: str
-    message: str
+    message: str = Field(..., description="The user's query or prompt")
+    llm_api_key: str = Field(..., description="User's LLM provider API key")
+    llm_model: str = Field(
+        default="llama-3.3-70b-versatile", 
+        description="Target model identifier"
+    )
+    llm_url: str = Field(
+        default="https://api.groq.com/openai/v1", 
+        description="OpenAI-compatible base URL"
+    )
+
 
