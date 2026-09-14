@@ -45,36 +45,28 @@ class CognitiveDecayEngine:
     
     async def run_decay_sweep(self):
         """
-        Executes a Cypher query to calculate cognitive ranks dynamically, 
-        archives nodes below the threshold, and returns the faded records for logging.
+        Retrieves decayable memories from the SQLite database, checks their 
+        cognitive rank against the threshold, and archives those that have faded.
         """
-        logger.info("Executing Neo4j Cognitive Decay Sweep.") 
+        logger.info("Executing SQLite Cognitive Decay Sweep.") 
 
-        # Cypher query performing inline rank calculation, threshold filtering, and archival update
-        decay_query = """
-        MATCH (m:SemanticMemory)
-        WHERE m.is_active = true 
-          AND m.retention_policy IN ['EPHEMERAL', 'SHORT_TERM']
-        WITH m,
-             (m.importance_score * m.confidence * 
-              CASE WHEN (1.0 + (m.strength - 1.0) * 0.2) > 3.0 THEN 3.0 
-                   ELSE (1.0 + (m.strength - 1.0) * 0.2) END) /
-             (1.0 + duration.between(datetime(m.last_accessed), datetime()).days * 0.05) AS current_rank
-        WHERE current_rank < $decay_threshold
-        SET m.is_active = false
-        RETURN elementId(m) AS id, m.subject AS subject, m.predicate AS predicate, m.object AS object, current_rank AS rank
-        """
+        # Fetching all memories that are eligible for decay from SQLite
+        records = self.db.get_decayable_memories()
+        ids_to_archive = []
 
-        async with self.driver.session() as session:
-            result = await session.run(decay_query, decay_threshold=self.decay_threshold)
-            records = await result.data()
-
-            if records:
-                for record in records:
+        # Checking which ones fall below threshold
+        if records:
+            for record in records:
+                if record['current_rank'] < self.decay_threshold:
+                    ids_to_archive.append(record['id'])
                     logger.info(
                         f"Memory {record['id']} [{record['subject']} -> {record['predicate']} -> {record['object']}] "
-                        f"has faded (Rank: {record['rank']:.4f} < Threshold: {self.decay_threshold}). Archiving."
+                        f"has faded (Rank: {record['current_rank']:.4f} < Threshold: {self.decay_threshold}). Archiving."
                     )
-                logger.info(f"Archived {len(records)} decayed memories from Neo4j active state.")
-            else:
-                logger.info("Decay Sweep complete. All active transient memories remain stable and intact.")
+
+        # 3. Archiving faded memories(if any)
+        if ids_to_archive:
+            self.db.archive_faded_memories(ids_to_archive)
+            logger.info(f"Archived {len(ids_to_archive)} decayed memories from SQLite active state.")
+        else:
+            logger.info("Decay Sweep complete. All active transient memories remain stable and intact.")

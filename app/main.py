@@ -13,6 +13,9 @@ from openai import AsyncOpenAI
 # importing config settings
 from app.config import settings
 
+import truststore
+truststore.inject_into_ssl()
+
 # Importing services 
 from app.services.database import MemoryDatabase 
 from app.core.security import verify_nd_api_key
@@ -55,7 +58,12 @@ async def lifespan(app:FastAPI):
        db = MemoryDatabase() 
        app.state.db = db
 
-       graph_manager = GraphManager(url=settings.neo4j_url, user=settings.neo4j_user, password=settings.neo4j_password.get_secret_value())
+       graph_manager = GraphManager(url=settings.NEO4J_URL, user=settings.NEO4J_USER, password=settings.NEO4J_PASSWORD.get_secret_value())
+       print("--- DEBUG SETTINGS ---")
+       print(f"URL: {settings.NEO4J_URL}")
+       print(f"USER: {settings.NEO4J_USER}")
+       print(f"PASSWORD: {settings.NEO4J_PASSWORD.get_secret_value()}")
+       print("----------------------")
        graph_manager.connect()
        graph_manager.setup_schema()
        graph_ingester = GraphIngester(graph_manager=graph_manager, ontology_path=ONTOLOGY_PATH)
@@ -92,8 +100,7 @@ async def lifespan(app:FastAPI):
        # Spawning the Cognitive Decay Engine
        # Checking every hour(3600s), archiving if rank drops below 0.12
        decay_engine = CognitiveDecayEngine(
-            uri=settings.neo4j_url,
-            auth=(settings.neo4j_user, settings.neo4j_password.get_secret_value()),
+            db=db,
             check_interval_seconds=3600,
             decay_threshold=0.12
         )
