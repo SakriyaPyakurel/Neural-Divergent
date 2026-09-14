@@ -81,7 +81,7 @@ class GraphManager:
         Helper method to execute cypher read transactions.
         """
         with self.driver.session() as session:
-            return self.execute_read(lambda tx: tx.run(query,parameters).data())
+            return session.execute_read(lambda tx: tx.run(query, parameters).data())
 
     def add_message_turn(self, user_id: str, message_id: str, speaker: str, text: str):
         """Appends a new message to the user's sequential conversation chain."""
