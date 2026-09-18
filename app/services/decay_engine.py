@@ -64,7 +64,7 @@ class CognitiveDecayEngine:
                         f"has faded (Rank: {record['current_rank']:.4f} < Threshold: {self.decay_threshold}). Archiving."
                     )
 
-        # 3. Archiving faded memories(if any)
+        # Archiving faded memories(if any)
         if ids_to_archive:
             self.db.archive_faded_memories(ids_to_archive)
             logger.info(f"Archived {len(ids_to_archive)} decayed memories from SQLite active state.")
