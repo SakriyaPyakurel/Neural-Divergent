@@ -138,7 +138,19 @@ async def list_nd_keys(
     ORDER BY k.created_at DESC
     """
     results = graph_manager.execute_read(cypher, {"user_id": user_id})
-    return [NDKeyMetadata(**record) for record in results]
+    formatted_keys = []
+    for record in results:
+        data = dict(record)
+        
+        # Converting Neo4j/datetime objects to strings if present
+        if data.get("last_used_at") is not None:
+            data["last_used_at"] = str(data["last_used_at"])
+        if data.get("created_at") is not None:
+            data["created_at"] = str(data["created_at"])
+            
+        formatted_keys.append(NDKeyMetadata(**data))
+
+    return formatted_keys
 
 @auth_router.delete("/keys/{key_id}")
 async def revoke_nd_key(

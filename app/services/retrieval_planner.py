@@ -36,7 +36,7 @@ class RetrievalPlanner:
           AND ALL(node IN nodes(path) WHERE node.is_active IS NULL OR node.is_active = true)
         WITH path, relationships(path) AS rels
         RETURN 
-            [n IN nodes(path) | {{id: gtid(n), labels: labels(n), props: properties(n)}}] AS nodes,
+            [n IN nodes(path) | {{id: elementId(n), labels: labels(n), props: properties(n)}}] AS nodes,
             [r IN rels | {{type: type(r), props: properties(r)}}] AS relationships
         LIMIT $limit
         """

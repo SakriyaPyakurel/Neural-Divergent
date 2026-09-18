@@ -59,11 +59,6 @@ async def lifespan(app:FastAPI):
        app.state.db = db
 
        graph_manager = GraphManager(url=settings.NEO4J_URL, user=settings.NEO4J_USER, password=settings.NEO4J_PASSWORD.get_secret_value())
-       print("--- DEBUG SETTINGS ---")
-       print(f"URL: {settings.NEO4J_URL}")
-       print(f"USER: {settings.NEO4J_USER}")
-       print(f"PASSWORD: {settings.NEO4J_PASSWORD.get_secret_value()}")
-       print("----------------------")
        graph_manager.connect()
        graph_manager.setup_schema()
        graph_ingester = GraphIngester(graph_manager=graph_manager, ontology_path=ONTOLOGY_PATH)
