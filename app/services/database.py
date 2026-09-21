@@ -1,454 +1,324 @@
-import sqlite3 
-import json 
-from typing import List, Dict, Optional, Any
-import sqlite_vec
+import os
+import json
 import logging
+from pathlib import Path
+from dotenv import load_dotenv
+from typing import List, Dict, Optional, Any, Union
+from neo4j import GraphDatabase
+
+logger = logging.getLogger(__name__)
+# Dynamically locating app/.env (one level up from app/services/database.py)
+BASE_DIR = Path(__file__).resolve().parent.parent
+ENV_PATH = BASE_DIR / ".env"
+
+# Loading the environment variables from app/.env
+load_dotenv(dotenv_path=ENV_PATH)
 
 class MemoryDatabase:
-    def __init__(self, db_path: str = "file::memory:?cache=shared"):
-        self.db_path = db_path 
-        # CRITICAL: Keeping a master connection open. 
-        # If all connections to an in-memory SQLite DB close, the database is deleted.
-        self._master_conn = sqlite3.connect(self.db_path, uri=True, check_same_thread=False)
-        self._master_conn.enable_load_extension(True)
-        sqlite_vec.load(self._master_conn)
+    def __init__(self, uri: str = None, user: str = None, password: str = None):
+        # Default to environment variables, crucial for Neo4j AuraDB
+        self.uri = uri or os.getenv("NEO4J_URL")
+        self.user = user or os.getenv("NEO4J_USER")
+        self.password = password or os.getenv("NEO4J_PASSWORD")
+
+        # Explicit validation check to catch missing env vars early
+        if not self.uri or not self.user or not self.password:
+            raise ValueError(
+                f"Missing Neo4j credentials. Looked in environment and at '{ENV_PATH}'. "
+                "Ensure NEO4J_URI, NEO4J_USERNAME, and NEO4J_PASSWORD are defined in your app/.env file."
+            )
         
-        self.setup_tables() 
+        # Initializing the Neo4j Driver
+        self.driver = GraphDatabase.driver(self.uri, auth=(self.user, self.password))
+        self.setup_tables()
 
-    def _get_connection(self):
-        """Creates and returns a database connection for Neural Divergent."""
-        # uri=True allows multiple threads to access the exact same shared memory database
-        conn = sqlite3.connect(self.db_path, uri=True, check_same_thread=False) 
-        conn.row_factory = sqlite3.Row # Returning rows as dictionaries instead of just raw tuples
+    def close(self):
+        """Always close the driver when the app shuts down."""
+        self.driver.close()
 
-        # Injecting the vector engine into the connection 
-        conn.enable_load_extension(True) 
-        sqlite_vec.load(conn) 
-        return conn
-    
     def setup_tables(self):
-        """Initializes the Proto-Graph schema if it is not existent."""
-        query = """
-        CREATE TABLE IF NOT EXISTS semantic_memories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            subject TEXT NOT NULL,
-            predicate TEXT NOT NULL,
-            object TEXT NOT NULL,
-            event_type TEXT,                -- Made NULLABLE to prevent extraction integrity issues
-            memory_category TEXT,           -- IDENTITY, PREFERENCE, KNOWLEDGE, etc.
-            source_text TEXT,               -- The raw sentence that triggered this extraction 
-            reason TEXT,
-            confidence REAL DEFAULT 1.0,
-            importance_score REAL DEFAULT 1.0,
-            strength INTEGER DEFAULT 1,    -- DEFAULTS to 1
-            metadata TEXT,                  -- Stored as a JSON string
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            is_active INTEGER DEFAULT 1,    -- 1 for active, 0 for historically overwritten
-            supersedes_id INTEGER,          -- References the memory ID this fact replaces
-            FOREIGN KEY(supersedes_id) REFERENCES semantic_memories(id)
-        );
+        """Initializes the Graph constraints and Vector Indexes for AuraDB."""
+        # Indices for faster exact-match and LIKE searches
+        indices = [
+            "CREATE INDEX memory_subject IF NOT EXISTS FOR (m:Memory) ON (m.subject)",
+            "CREATE INDEX memory_predicate IF NOT EXISTS FOR (m:Memory) ON (m.predicate)",
+            "CREATE INDEX memory_object IF NOT EXISTS FOR (m:Memory) ON (m.object)"
+        ]
+        
+        # Native Neo4j Vector Index (384 dimensions for standard embedding models)
+        vector_index_query = """
+        CREATE VECTOR INDEX memory_vectors IF NOT EXISTS
+        FOR (m:Memory) ON (m.embedding)
+        OPTIONS {indexConfig: {
+            `vector.dimensions`: 384,
+            `vector.similarity_function`: 'cosine'
+        }}
         """
-        # Creating indices for quick relational and subject lookups
-        index_triples = """
-        CREATE INDEX IF NOT EXISTS idx_triple ON semantic_memories(subject, predicate, object);
-        """
-        index_subject = """
-        CREATE INDEX IF NOT EXISTS idx_subject ON semantic_memories(subject);
-        """
+        
+        with self.driver.session() as session:
+            for query in indices:
+                session.run(query)
+            session.run(vector_index_query)
+            logger.info("Neo4j indexes and vector schemas initialized.")
 
-        # Adding Vector Table Schema
-        query_vectors = """
-        CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
-            embedding float[384]
-        );
-        """
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query) 
-            cursor.execute(index_triples) 
-            cursor.execute(index_subject) 
-            # Initializing the vector table
-            cursor.execute(query_vectors) 
-            conn.commit()
+    def _format_record(self, record, node_alias: str = "m", extra_fields: List[str] = None) -> Dict:
+        """Helper to convert a Neo4j Node Record into a Python dictionary matching the old SQLite format."""
+        node = record[node_alias]
+        result = dict(node.items())
+        
+        # Neo4j uses string elementIds in v5+ instead of auto-incrementing integers
+        result['id'] = node.element_id 
+        
+        # Format Neo4j DateTime objects back to strings
+        if 'created_at' in result:
+            result['created_at'] = str(result['created_at'])
+        if 'last_accessed' in result:
+            result['last_accessed'] = str(result['last_accessed'])
+            
+        if 'metadata' in result and isinstance(result['metadata'], str):
+            try:
+                result['metadata'] = json.loads(result['metadata'])
+            except json.JSONDecodeError:
+                pass
+                
+        # Injecting dynamic calculated fields (like distance, cognitive_rank)
+        if extra_fields:
+            for field in extra_fields:
+                if field in record:
+                    result[field] = record[field]
+                    
+        return result
 
     def find_exact_triple(self, subject: str, predicate: str, object_val: str) -> Optional[Dict]:
-        """Checks if a specific, exact memory already is in existence to prevent duplicate entries."""
         query = """
-        SELECT * FROM semantic_memories 
-        WHERE subject = ? AND predicate = ? AND object = ? AND is_active = 1
+        MATCH (m:Memory {subject: $subject, predicate: $predicate, object:$object, is_active: 1})
+        RETURN m LIMIT 1
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, (subject, predicate, object_val)) 
-            row = cursor.fetchone() 
-            return dict(row) if row else None 
-    
+        with self.driver.session() as session:
+            result = session.run(query, subject=subject, predicate=predicate, object=object_val).single()
+            return self._format_record(result) if result else None
+
     def find_by_subject_and_predicate(self, subject: str, predicate: str) -> List[Dict]:
-        """Finds active memories based on subject and relationship."""
         query = """
-        SELECT * FROM semantic_memories 
-        WHERE subject = ? AND predicate = ? AND is_active = 1
+        MATCH (m:Memory {subject: $subject, predicate:$predicate, is_active: 1})
+        RETURN m
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, (subject, predicate)) 
-            return [dict(row) for row in cursor.fetchall()]
-    
+        with self.driver.session() as session:
+            records = session.run(query, subject=subject, predicate=predicate)
+            return [self._format_record(record) for record in records]
+
     def find_related_memories(self, subject: str) -> List[Dict]:
-        """Retrieves all active facts related to a specific subject node."""
         query = """
-        SELECT * FROM semantic_memories 
-        WHERE subject LIKE ? AND is_active = 1
-        ORDER BY last_accessed DESC
+        MATCH (m:Memory)
+        WHERE m.subject CONTAINS $subject AND m.is_active = 1
+        RETURN m ORDER BY m.last_accessed DESC
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute(query, (f"%{subject}%",))
-            return [dict(row) for row in cursor.fetchall()]
-        
+        with self.driver.session() as session:
+            records = session.run(query, subject=subject)
+            return [self._format_record(record) for record in records]
+
     def insert_triple(self, subject: str, predicate: str, object_val: str,
                       importance_score: float, event_type: Optional[str] = None, memory_category: Optional[str] = None,
                       source_text: Optional[str] = None, reason: Optional[str] = None,
                       confidence: float = 1.0, metadata: Dict = None,
-                      supersedes_id: Optional[int] = None,
-                      vector_embedding: Optional[List[float]] = None) -> int:
-        """Inserts a new semantic node/edge into the ledger with full metadata."""
+                      supersedes_id: Optional[str] = None,
+                      vector_embedding: Optional[List[float]] = None) -> str:
+        """Inserts memory node. Note: Returns a string UUID (elementId) instead of an int."""
         query = """
-         INSERT INTO semantic_memories 
-        (subject, predicate, object, importance_score, event_type, memory_category, source_text, reason, confidence, metadata, supersedes_id)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        CREATE (m:Memory {
+            subject: $subject, predicate: $predicate, object:$object,
+            importance_score: $importance_score, event_type:$event_type,
+            memory_category: $memory_category, source_text:$source_text,
+            reason: $reason, confidence:$confidence,
+            metadata: $metadata, supersedes_id:$supersedes_id,
+            strength: 1, is_active: 1,
+            created_at: datetime(), last_accessed: datetime()
+        })
         """
+        if vector_embedding:
+            query += " SET m.embedding = $embedding"
+            
+        query += " RETURN elementId(m) AS new_id"
+        
         meta_str = json.dumps(metadata) if metadata else "{}" 
 
-        with self._get_connection() as conn:
-            cursor = conn.cursor()
-            # Inserting the deterministic proto-graph memory 
-            cursor.execute(query, (
-                subject, predicate, object_val, importance_score, event_type, 
-                memory_category, source_text, reason, confidence, meta_str, supersedes_id
-            ))
-            # grabbing the newly generated ID
-            new_memory_id = cursor.lastrowid
+        with self.driver.session() as session:
+            result = session.run(query, 
+                subject=subject, predicate=predicate, object=object_val,
+                importance_score=importance_score, event_type=event_type,
+                memory_category=memory_category, source_text=source_text,
+                reason=reason, confidence=confidence, metadata=meta_str,
+                supersedes_id=supersedes_id, embedding=vector_embedding
+            )
+            return result.single()["new_id"]
 
-            # Inserting the vector using the same ID for locking them together
-            if vector_embedding:
-                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
-                cursor.execute("INSERT INTO memory_vectors(rowid, embedding) VALUES (?, ?)",
-                               (new_memory_id, vector_bytes))
-            conn.commit() 
-        return new_memory_id
-    
-    def reinforce_memory(self, memory_id: int, new_source_text: str, vector_embedding: Optional[List[float]] = None):
-        """Updates the source text and bumps the last_accessed timestamp for an existing memory."""
+    def reinforce_memory(self, memory_id: Union[str, int], new_source_text: str, vector_embedding: Optional[List[float]] = None):
         query = """
-        UPDATE semantic_memories 
-        SET source_text = ?, 
-            last_accessed = CURRENT_TIMESTAMP
-        WHERE id = ?
+        MATCH (m:Memory) WHERE elementId(m) = $id
+        SET m.source_text = $source_text,
+            m.last_accessed = datetime()
         """
+        if vector_embedding:
+            query += " SET m.embedding = $embedding"
+            
+        with self.driver.session() as session:
+            session.run(query, id=str(memory_id), source_text=new_source_text, embedding=vector_embedding)
 
-        # Executing and committing the transaction
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, (new_source_text, memory_id)) 
-            if vector_embedding:
-                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
-                # SQL syntax for updating vectors
-                cursor.execute("UPDATE memory_vectors SET embedding=? WHERE rowid=?",
-                               (vector_bytes, memory_id))
-            conn.commit()          
-    
-    def deprecate_memory(self, memory_id: int):
-        """Soft deletes a memory(sets is_active to 0)""" 
-        query = "UPDATE semantic_memories SET is_active = 0 WHERE id = ?"
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, (memory_id,)) 
-            conn.commit()
-    
-    def touch_memory(self, memory_id: int, new_source_text: str, vector_embedding: Optional[List[float]] = None):
-        """Updates the access heartbeat when a memory is accessed or confirmed."""
+    def deprecate_memory(self, memory_id: Union[str, int]):
+        query = "MATCH (m:Memory) WHERE elementId(m) = $id SET m.is_active = 0"
+        with self.driver.session() as session:
+            session.run(query, id=str(memory_id))
+
+    def touch_memory(self, memory_id: Union[str, int], new_source_text: str, vector_embedding: Optional[List[float]] = None):
+        """Updates the access heartbeat with Neo4j CASE WHEN logic replacing SQLite MIN/MAX"""
         query = """
-        UPDATE semantic_memories SET source_text=?,
-                last_accessed = CURRENT_TIMESTAMP,
-                strength = strength+1,
-                importance_score = MIN(1.0, importance_score+0.05),
-                -- Confidence Evolution: Closing 20 percent of the remaining gap to 1.0 (Asymptotic Growth)--
-                confidence = MIN(1.0, confidence + (1.0 - confidence) * 0.2)
-                WHERE id = ?
+        MATCH (m:Memory) WHERE elementId(m) = $id
+        SET m.source_text = $source_text,
+            m.last_accessed = datetime(),
+            m.strength = m.strength + 1,
+            m.importance_score = CASE WHEN m.importance_score + 0.05 < 1.0 THEN m.importance_score + 0.05 ELSE 1.0 END,
+            m.confidence = CASE WHEN m.confidence + (1.0 - m.confidence) * 0.2 < 1.0 THEN m.confidence + (1.0 - m.confidence) * 0.2 ELSE 1.0 END
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, (new_source_text, memory_id)) 
-            if vector_embedding:
-                vector_bytes = sqlite_vec.serialize_float32(vector_embedding) 
-                # SQL syntax for updating vectors
-                cursor.execute("UPDATE memory_vectors SET embedding=? WHERE rowid=?",
-                               (vector_bytes, memory_id))
-            conn.commit()
+        if vector_embedding:
+            query += " SET m.embedding = $embedding"
+
+        with self.driver.session() as session:
+            session.run(query, id=str(memory_id), source_text=new_source_text, embedding=vector_embedding)
 
     def search_normal_memories(self, search_term: str) -> List[Dict]:
-        """
-        Search active memories using a ranked simple term lookup 
-        """
-        like_term = f"%{search_term.strip()}%" 
         query = """
-                SELECT *
-                FROM semantic_memories
-                WHERE is_active = 1
-                AND (
-                LOWER(subject) LIKE LOWER(?)
-                OR LOWER(predicate) LIKE LOWER(?)
-                OR LOWER(object) LIKE LOWER(?)
-               )
-            ORDER BY importance_score DESC,
-            strength DESC,
-            confidence DESC;
+        MATCH (m:Memory)
+        WHERE m.is_active = 1
+          AND (toLower(m.subject) CONTAINS toLower($term) 
+               OR toLower(m.predicate) CONTAINS toLower($term) 
+               OR toLower(m.object) CONTAINS toLower($term))
+        RETURN m
+        ORDER BY m.importance_score DESC, m.strength DESC, m.confidence DESC
         """
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor() 
-                cursor.execute(query, (like_term, like_term, like_term))
-                columns = [column[0] for column in cursor.description] 
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Search failed: {e}") 
-            return []
-        return results
+        with self.driver.session() as session:
+            records = session.run(query, term=search_term.strip())
+            return [self._format_record(rec) for rec in records]
 
     def search_hybrid_memories(self, query_embedding: List[float], limit: int = 10) -> List[Dict]:
-        """
-        Search active memories using a HYBRID approach(Vector Semantic Search + Keyword Match),
-        ranking the results via unified cognitive scoring formula.
-        """
-        vector_bytes = sqlite_vec.serialize_float32(query_embedding)
-
-        # Grabbing the top 50 semantic matches, plus any direct keyword matches,
-        # then applying cognitive rank to the combined pool.
+        """Hybrid Search utilizing Neo4j's db.index.vector.queryNodes and duration math for decay."""
         query = """
-           WITH vector_matches AS (
-    SELECT
-        rowid,
-        distance
-    FROM memory_vectors
-    WHERE embedding MATCH ?
-      AND k = 50
-)
-SELECT
-    sm.*,
-    vm.distance,
-    (
-        MAX(0.01, 1.0 - vm.distance)
-        * sm.importance_score
-        * sm.confidence
-        * MIN(
-            3.0,
-            1.0 + (sm.strength - 1.0) * 0.2
-        )
-    )
-    /
-    (
-        1.0 +
-        (
-            julianday('now') -
-            julianday(sm.last_accessed)
-        ) * 0.05
-    )
-    AS cognitive_rank
-
-FROM vector_matches vm
-JOIN semantic_memories sm
-ON sm.rowid = vm.rowid
-
-WHERE sm.is_active = 1
-
-ORDER BY
-    cognitive_rank DESC,
-    vm.distance ASC
-LIMIT ?;
-        """
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(query, (vector_bytes, limit))
-                columns = [column[0] for column in cursor.description]
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            for res in results:
-                res['cognitive_rank'] = round(res['cognitive_rank'], 4)
-            return results
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Search failed: {e}") 
-            return []
-
-    def get_subject_history(self, subject: str, include_inactive: bool = True, limit: int = 50) -> List[Dict[str, Any]]:
-        """
-         Returns the complete memory timeline for a subject.
-        """  
-        query = """
-        SELECT *
-        FROM semantic_memories
-        WHERE subject = ?
-        """
-        params = [subject] 
-        if not include_inactive:
-            query += " AND is_active = 1"
-        query += """
-        ORDER BY created_at DESC
-        LIMIT ?
-        """
-        params.append(limit)
-
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute(query, params) 
-                columns = [column[0] for column in cursor.description] 
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Subject history failed: {e}")
-            return []
-        
-    def get_predicate_history(self, subject: str, predicate: str, include_inactive: bool = True, limit: int = 50) -> List[Dict[str, Any]]:
-        """
-        Returns the historical evolution of a subject-predicate pair.
-        """
-        query = """
-        SELECT *
-        FROM semantic_memories
-        WHERE subject = ?
-        AND predicate = ?
-        """
-        params = [subject, predicate] 
-        if not include_inactive:
-            query += " AND is_active = 1"
-        query += """
-        ORDER BY created_at ASC
-        LIMIT ?
-        """
-        params.append(limit)
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor() 
-                cursor.execute(query, params) 
-                columns = [column[0] for column in cursor.description] 
-                return [dict(zip(columns, row)) for row in cursor.fetchall()] 
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Predicate history failed: {e}")
-            return []
-    
-    def get_recent_history(self, include_inactive: bool = True, limit: int = 50) -> List[Dict[str, Any]]:
-        """
-        Returns the most recently stored memories.
-        """
-        query = """
-        SELECT *
-        FROM semantic_memories
-        """
-        params = [] 
-        if not include_inactive:
-            query += " WHERE is_active = 1"
-        query += """
-        ORDER BY created_at DESC
-        LIMIT ?
-        """
-        params.append(limit) 
-
-        try: 
-            with self._get_connection() as conn:
-                cursor = conn.cursor() 
-                cursor.execute(query, params) 
-                columns = [column[0] for column in cursor.description] 
-                return [dict(zip(columns, row)) for row in cursor.fetchall()]
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Recent history failed: {e}")
-            return []
-
-    def traverse_memory_graph(self, root_entity: str, limit: int = 15) -> List[Dict[str, Any]]:
-        """
-        Performs a 1-degree graph traversal from a root entity.
-        Returns direct matches(depth 0) and related cognitive memories(depth 1),
-        ranked by cognitive strength
-        """
-        query = """
-              WITH direct_matches AS (
-                -- Depth 0: Exact or partial matches to the root entity
-                SELECT id, subject, object
-                FROM semantic_memories
-                WHERE is_active = 1 
-                  AND (subject LIKE ? OR object LIKE ?)
-                ORDER BY importance_score DESC
-                LIMIT 5 -- Bounding the start nodes so the graph doesn't explode
-            ),
-            connected_memories AS (
-                -- Fetch the full rows for Depth 0 Nodes
-                SELECT m.*, 0 AS traversal_depth
-                FROM semantic_memories m
-                JOIN direct_matches d ON m.id = d.id
-                
-                UNION
-                
-                -- Depth 1: Associative Nodes connected to Depth 0
-                -- (e.g., sharing the same subject or object)
-                SELECT m.*, 1 AS traversal_depth
-                FROM semantic_memories m
-                JOIN direct_matches d 
-                  ON (m.subject = d.subject OR m.object = d.subject OR m.subject = d.object OR m.object = d.object)
-                WHERE m.is_active = 1 AND m.id != d.id
+        CALL db.index.vector.queryNodes('memory_vectors', 50, $embedding) YIELD node AS m, score AS similarity
+        WHERE m.is_active = 1
+        WITH m, similarity,
+            (
+                (CASE WHEN similarity > 0.01 THEN similarity ELSE 0.01 END)
+                * m.importance_score
+                * m.confidence
+                * (CASE WHEN 1.0 + (m.strength - 1.0) * 0.2 < 3.0 THEN 1.0 + (m.strength - 1.0) * 0.2 ELSE 3.0 END)
             )
-            SELECT *,
-                -- Calculate Cognitive Rank for the entire associative web
-                (importance_score * confidence * MIN(3.0, 1.0 + (strength - 1.0) * 0.2)) / 
-                (1.0 + (julianday('now') - julianday(last_accessed)) * 0.05) AS cognitive_rank
-            FROM connected_memories
-            GROUP BY id  -- Deduplicate if a memory was reached via multiple associative paths
-            ORDER BY traversal_depth ASC, cognitive_rank DESC
-            LIMIT ?
-            """
-        like_term = f"%{root_entity.strip()}%"
-        try:
-            with self._get_connection() as conn:
-                cursor = conn.cursor() 
-                cursor.execute(query, (like_term, like_term, limit)) 
-                columns = [column[0] for column in cursor.description] 
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()] 
-
-                for res in results:
-                    res['cognitive_rank'] = round(res['cognitive_rank'], 4) 
-                
-                return results 
-        except Exception as e:
-            logging.getLogger(__name__).error(f"Graph traversal failed: {e}")
-            return []
-
-    def get_decayable_memories(self) -> List[Dict[str, Any]]:
+            /
+            (
+                1.0 + (duration.between(m.last_accessed, datetime()).seconds / 86400.0) * 0.05
+            ) AS cognitive_rank
+        RETURN m, similarity AS distance, cognitive_rank
+        ORDER BY cognitive_rank DESC, distance DESC
+        LIMIT $limit
         """
-        Returns active EPHEMERAL or SHORT_TERM memories with their
-        dynamically calculated cognitive rank to evaluate for archival.
-        """
+        with self.driver.session() as session:
+            records = session.run(query, embedding=query_embedding, limit=limit)
+            results = []
+            for rec in records:
+                formatted = self._format_record(rec, extra_fields=['distance', 'cognitive_rank'])
+                formatted['cognitive_rank'] = round(formatted['cognitive_rank'], 4)
+                results.append(formatted)
+            return results
+
+    def get_subject_history(self, subject: str, include_inactive: bool = True, limit: int = 50) -> List[Dict]:
+        query = "MATCH (m:Memory {subject: $subject}) "
+        if not include_inactive:
+            query += "WHERE m.is_active = 1 "
+        query += "RETURN m ORDER BY m.created_at DESC LIMIT $limit"
+        
+        with self.driver.session() as session:
+            records = session.run(query, subject=subject, limit=limit)
+            return [self._format_record(rec) for rec in records]
+
+    def get_predicate_history(self, subject: str, predicate: str, include_inactive: bool = True, limit: int = 50) -> List[Dict]:
+        query = "MATCH (m:Memory {subject: $subject, predicate:$predicate}) "
+        if not include_inactive:
+            query += "WHERE m.is_active = 1 "
+        query += "RETURN m ORDER BY m.created_at ASC LIMIT $limit"
+
+        with self.driver.session() as session:
+            records = session.run(query, subject=subject, predicate=predicate, limit=limit)
+            return [self._format_record(rec) for rec in records]
+
+    def get_recent_history(self, include_inactive: bool = True, limit: int = 50) -> List[Dict]:
+        query = "MATCH (m:Memory) "
+        if not include_inactive:
+            query += "WHERE m.is_active = 1 "
+        query += "RETURN m ORDER BY m.created_at DESC LIMIT $limit"
+
+        with self.driver.session() as session:
+            records = session.run(query, limit=limit)
+            return [self._format_record(rec) for rec in records]
+
+    def traverse_memory_graph(self, root_entity: str, limit: int = 15) -> List[Dict]:
+        """Translated the complex multi-step CTE directly into a Neo4j CALL {} UNION structure."""
         query = """
-               SELECT *,
-               (importance_score * confidence * MIN(3.0, 1.0 + (strength - 1.0) * 0.2)) /
-               (1.0 + (julianday('now') - julianday(last_accessed)) * 0.05) AS current_rank
-               FROM semantic_memories
-               WHERE is_active=1
-               AND json_extract(metadata,'$.retention_policy') IN ('EPHEMERAL','SHORT_TERM')
+        CALL {
+            WITH $root AS root_term
+            MATCH (m:Memory)
+            WHERE m.is_active = 1 AND (m.subject CONTAINS root_term OR m.object CONTAINS root_term)
+            RETURN m, 0 AS traversal_depth
+            ORDER BY m.importance_score DESC
+            LIMIT 5
+        }
+        UNION
+        CALL {
+            WITH $root AS root_term
+            MATCH (m0:Memory)
+            WHERE m0.is_active = 1 AND (m0.subject CONTAINS root_term OR m0.object CONTAINS root_term)
+            WITH m0 ORDER BY m0.importance_score DESC LIMIT 5
+            
+            MATCH (m1:Memory)
+            WHERE m1.is_active = 1 
+              AND elementId(m1) <> elementId(m0)
+              AND (m1.subject IN [m0.subject, m0.object] OR m1.object IN [m0.subject, m0.object])
+            RETURN m1 AS m, 1 AS traversal_depth
+        }
+        WITH m, min(traversal_depth) AS depth 
+        WITH m, depth,
+             (m.importance_score * m.confidence * CASE WHEN 1.0 + (m.strength - 1.0) * 0.2 < 3.0 THEN 1.0 + (m.strength - 1.0) * 0.2 ELSE 3.0 END) / 
+             (1.0 + (duration.between(m.last_accessed, datetime()).seconds / 86400.0) * 0.05) AS cognitive_rank
+        RETURN m, depth AS traversal_depth, cognitive_rank
+        ORDER BY depth ASC, cognitive_rank DESC
+        LIMIT $limit
         """
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query) 
-            columns = [column[0] for column in cursor.description] 
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()] 
-        return results
-    
-    def archive_faded_memories(self, ids_to_archive: List[int]):
-        """Bulk archives memories by turning off their respective active flag""" 
+        with self.driver.session() as session:
+            records = session.run(query, root=root_entity.strip(), limit=limit)
+            results = []
+            for rec in records:
+                formatted = self._format_record(rec, extra_fields=['traversal_depth', 'cognitive_rank'])
+                formatted['cognitive_rank'] = round(formatted['cognitive_rank'], 4)
+                results.append(formatted)
+            return results
+
+    def get_decayable_memories(self) -> List[Dict]:
+        query = """
+        MATCH (m:Memory)
+        WHERE m.is_active = 1 AND m.metadata CONTAINS 'EPHEMERAL' OR m.metadata CONTAINS 'SHORT_TERM'
+        WITH m,
+             (m.importance_score * m.confidence * CASE WHEN 1.0 + (m.strength - 1.0) * 0.2 < 3.0 THEN 1.0 + (m.strength - 1.0) * 0.2 ELSE 3.0 END) / 
+             (1.0 + (duration.between(m.last_accessed, datetime()).seconds / 86400.0) * 0.05) AS current_rank
+        RETURN m, current_rank
+        """
+        with self.driver.session() as session:
+            records = session.run(query)
+            return [self._format_record(rec, extra_fields=['current_rank']) for rec in records]
+
+    def archive_faded_memories(self, ids_to_archive: List[Union[str, int]]):
         if not ids_to_archive:
-            return 
-        placeholders = ','.join('?' for _ in ids_to_archive) 
-        query = f"UPDATE semantic_memories SET is_active = 0 WHERE id IN ({placeholders})" 
-        with self._get_connection() as conn:
-            cursor = conn.cursor() 
-            cursor.execute(query, ids_to_archive) 
-            conn.commit() 
-        logging.getLogger(__name__).info(f"Archived {len(ids_to_archive)} decayed memories from active state.")
+            return
+        
+        string_ids = [str(i) for i in ids_to_archive]
+        query = "MATCH (m:Memory) WHERE elementId(m) IN $ids SET m.is_active = 0"
+        
+        with self.driver.session() as session:
+            session.run(query, ids=string_ids)
+            logger.info(f"Archived {len(ids_to_archive)} decayed memories.")

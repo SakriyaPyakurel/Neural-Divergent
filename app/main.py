@@ -55,12 +55,11 @@ async def lifespan(app:FastAPI):
        ONTOLOGY_PATH = "app/ontology/predicate_ontology.json"
        SEMANTIC_PATH = "app/ontology/semantic_normalization.json"
 
-       db = MemoryDatabase() 
+       db = MemoryDatabase(uri=settings.NEO4J_URL,user=settings.NEO4J_USER,password=settings.NEO4J_PASSWORD.get_secret_value()) 
        app.state.db = db
 
        graph_manager = GraphManager(url=settings.NEO4J_URL, user=settings.NEO4J_USER, password=settings.NEO4J_PASSWORD.get_secret_value())
        graph_manager.connect()
-       graph_manager.setup_schema()
        graph_ingester = GraphIngester(graph_manager=graph_manager, ontology_path=ONTOLOGY_PATH)
 
        # Initializing the Retrieval Planner and attaching it to app state
@@ -173,7 +172,7 @@ async def chat_endpoint(request: ChatRequest, fastapi_req: Request, background_t
                 api_key=request.llm_api_key,
                 base_url=request.llm_url,
                 timeout=30.0)
-    except:
+    except Exception as e:
         logger.error(f"Failed to initialize dynamic LLM client: {e}")
         raise HTTPException(status_code=400, detail="Invalid LLM client configuration.")
 
@@ -205,13 +204,13 @@ async def chat_endpoint(request: ChatRequest, fastapi_req: Request, background_t
 
     try:
         response = await user_llm_client.chat.completions.create(
-            model="openai/gpt-oss-20b",
+            model=request.llm_model,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": request.message}
             ],
-            temperature=0.7,
-            max_tokens=500
+            temperature=request.temperature,
+            max_tokens=request.max_tokens
         )
         final_answer = response.choices[0].message.content
 
