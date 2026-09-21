@@ -77,5 +77,6 @@ class ChatRequest(BaseModel):
         default="https://api.groq.com/openai/v1", 
         description="OpenAI-compatible base URL"
     )
-
+    temperature : float = Field(0.7,description="Temperature (0.0 to 1.0).") 
+    max_tokens: int = 500
 

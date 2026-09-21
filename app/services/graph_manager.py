@@ -20,7 +20,7 @@ class GraphManager:
             self.driver = GraphDatabase.driver(self.url,auth=(self.user,self.password))
             self.driver.verify_connectivity() 
             logger.info("Successfully connected to Graph Database.")
-            self._initialize_constraints()
+            self._initialize_schema()
         except ServiceUnavailable as su:
             logger.error(f"Failed to connect to Graph Database: {su}") 
             raise 
@@ -30,44 +30,34 @@ class GraphManager:
             self.driver.close() 
             logger.info("Graph Database connection closed.") 
 
-    def _initialize_constraints(self):
+    def _initialize_schema(self):
         """
-        Sets up the database constraints to ensure data integrity.
-        Prevents duplicate entries (like multiple 'user' or 'Python' nodes).
+        Initializes constraints and indexes for the Cognitive Memory Graph.
+        Uses IF NOT EXISTS so it is completely safe to run on every startup.
         """
-        cypher_queries = [
-            # Ensuring the Subject (e.g., 'user') is unique
-            "CREATE CONSTRAINT unique_subject IF NOT EXISTS FOR (s:Subject) REQUIRE s.name IS UNIQUE",
-            
-            # Ensuring the Object/Concept (e.g., 'Python', 'Kathmandu') is unique
-            "CREATE CONSTRAINT unique_concept IF NOT EXISTS FOR (c:Concept) REQUIRE c.name IS UNIQUE"
-        ]
-
-        with self.driver.session() as session:
-            for query in cypher_queries:
-                try:
-                    session.run(query) 
-                except Exception as e:
-                    logger.warning(f"Constraint issue: {e}") 
-            logger.info("Graph constraints verified.")
-
-    def setup_schema(self):
-        """Initializes constraints and indexes for the Cognitive Memory Graph."""
         queries = [
-            # Uniqueness Constraints
+            # Uniqueness Constraints (Prevents duplicates)
+            "CREATE CONSTRAINT unique_subject IF NOT EXISTS FOR (s:Subject) REQUIRE s.name IS UNIQUE",
+            "CREATE CONSTRAINT unique_concept IF NOT EXISTS FOR (c:Concept) REQUIRE c.name IS UNIQUE",
             "CREATE CONSTRAINT user_id_unique IF NOT EXISTS FOR (u:User) REQUIRE u.user_id IS UNIQUE",
             "CREATE CONSTRAINT msg_id_unique IF NOT EXISTS FOR (m:Message) REQUIRE m.message_id IS UNIQUE",
             "CREATE CONSTRAINT ded_id_unique IF NOT EXISTS FOR (d:Deduction) REQUIRE d.deduction_id IS UNIQUE",
             
-            # Indexes for fast retrieval and pruning
+            # Performance Indexes (Speeds up filtering and lookups)
             "CREATE INDEX deduction_active_idx IF NOT EXISTS FOR (d:Deduction) ON (d.is_active)",
-            "CREATE INDEX concept_name_idx IF NOT EXISTS FOR (c:Concept) ON (c.name)"
+            "CREATE INDEX concept_name_idx IF NOT EXISTS FOR (c:Concept) ON (c.name)",
+            "CREATE INDEX user_active_idx IF NOT EXISTS FOR (u:User) ON (u.is_active)"
         ]
         
         with self.driver.session() as session:
             for query in queries:
-                session.run(query)
-            logger.info("Graph indexes initialized.")
+                try:
+                    session.run(query)
+                except Exception as e:
+                    # Logs a warning but doesn't crash the app if one index fails
+                    logger.warning(f"Schema setup warning for query [{query}]: {e}") 
+                    
+            logger.info("Graph constraints and indexes verified.")
 
     def execute_write(self,query,parameters=None):
         """
