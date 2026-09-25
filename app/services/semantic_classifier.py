@@ -1,10 +1,12 @@
-from transformers import pipeline
-from typing import Dict,Tuple
+import numpy as np
+from typing import Dict, Tuple
+from fastembed import TextEmbedding
 from app.models.memory import MemoryCategory
 
 class SemanticClassifier:
     def __init__(self):
-        self.classifier = pipeline("zero-shot-classification",model="facebook/bart-large-mnli")
+        # Reusing the exact same lightweight model from database setup
+        self.embedding_model = TextEmbedding(model_name="BAAI/bge-small-en-v1.5")
 
         # High-Signal descriptive hypotheses mapped directly to MemoryCategory enums
         self.CATEGORY_MAP: Dict[str, MemoryCategory] = {
@@ -15,6 +17,7 @@ class SemanticClassifier:
             "general factual knowledge, scientific truths, or external data points": MemoryCategory.KNOWLEDGE,
             "a past event, action, historical incident, or lived experience": MemoryCategory.EXPERIENCE
         }
+        
         self.EVENT_MAP: Dict[str, str] = {
             "a factual assertion or permanent state of truth": "Fact",
             "a specific action, operational change, or completed event": "Action",
@@ -22,39 +25,42 @@ class SemanticClassifier:
             "a future goal, intention, roadmap objective, or plan": "Goal"
         }
 
-    def resolve_ambiguity(self,raw_message:str) -> Tuple[MemoryCategory,str,float]:
+        # Pre-compute embeddings for hypotheses at startup (only takes ~0.1 seconds)
+        self.cat_phrases = list(self.CATEGORY_MAP.keys())
+        self.cat_embeddings = list(self.embedding_model.embed(
+            [f"This text explicitly documents {cat}." for cat in self.cat_phrases]
+        ))
+
+        self.event_phrases = list(self.EVENT_MAP.keys())
+        self.event_embeddings = list(self.embedding_model.embed(
+            [f"This statement represents {event}." for event in self.event_phrases]
+        ))
+
+    def _cosine_similarity(self, v1: np.ndarray, v2: np.ndarray) -> float:
+        """Calculates mathematical distance between two semantic vectors"""
+        return float(np.dot(v1, v2) / (np.linalg.norm(v1) * np.linalg.norm(v2)))
+
+    def resolve_ambiguity(self, raw_message: str) -> Tuple[MemoryCategory, str, float]:
         """
-        Runs deep semantic evaluation only when deterministic ontology lookups return unknown.
-        Executes exactly twice per ambiguous sentence, optimizing token processing.
+        Runs deep semantic evaluation using vector similarity.
+        Executes without PyTorch, keeping RAM under 150MB total.
         """
-        # Resolving Memory Category
-        cat_labels = list(self.CATEGORY_MAP.keys())
-        cat_result = self.classifier(
-            raw_message,
-            candidate_labels=cat_labels,
-            hypothesis_template="This text explicitly documents {}.",
-            multi_label=False
-        )
-        best_cat_phrase = cat_result['labels'][0] 
-        cat_score = cat_result['scores'][0] 
-        resolved_category = self.CATEGORY_MAP[best_cat_phrase] 
+        # Embedding the user's message
+        msg_embedding = list(self.embedding_model.embed([raw_message]))[0]
 
-        # Resolving Event Type
-        event_labels = list(self.EVENT_MAP.keys()) 
-        event_result = self.classifier(
-            raw_message,
-            candidate_labels=event_labels,
-            hypothesis_template = "This statement represents {}.",
-            multi_label = False
-        )
-        best_event_phrase = event_result['labels'][0] 
-        event_score = event_result['scores'][0] 
-        resolved_event_type = self.EVENT_MAP[best_event_phrase] 
+        # Scoring Categories
+        cat_scores = [self._cosine_similarity(msg_embedding, cat_emb) for cat_emb in self.cat_embeddings]
+        best_cat_idx = int(np.argmax(cat_scores))
+        resolved_category = self.CATEGORY_MAP[self.cat_phrases[best_cat_idx]]
+        cat_score = cat_scores[best_cat_idx]
 
-        # Blended processing of scores for evaluation in down stream
-        blended_confidence = round((cat_score+event_score)/2,4)
+        # Score Events
+        event_scores = [self._cosine_similarity(msg_embedding, ev_emb) for ev_emb in self.event_embeddings]
+        best_event_idx = int(np.argmax(event_scores))
+        resolved_event_type = self.EVENT_MAP[self.event_phrases[best_event_idx]]
+        event_score = event_scores[best_event_idx]
 
-        return resolved_category,resolved_event_type,blended_confidence
+        # lended processing of scores for downstream evaluation
+        blended_confidence = round((cat_score + event_score) / 2, 4)
 
-        
-        
+        return resolved_category, resolved_event_type, blended_confidence
