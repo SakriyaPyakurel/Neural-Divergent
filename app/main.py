@@ -1,10 +1,13 @@
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
 from fastapi import FastAPI,Request,BackgroundTasks,Depends,HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager 
 import logging 
 from pathlib import Path
 from dotenv import load_dotenv
-import os
 import uuid
 
 # Importing the LLM SDK
