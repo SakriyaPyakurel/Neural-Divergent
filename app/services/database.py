@@ -84,7 +84,7 @@ class MemoryDatabase:
         # Injecting dynamic calculated fields (like distance, cognitive_rank)
         if extra_fields:
             for field in extra_fields:
-                if field in record:
+                if field in record.keys():
                     result[field] = record[field]
                     
         return result
@@ -302,7 +302,8 @@ class MemoryDatabase:
     def get_decayable_memories(self) -> List[Dict]:
         query = """
         MATCH (m:Memory)
-        WHERE m.is_active = 1 AND m.metadata CONTAINS 'EPHEMERAL' OR m.metadata CONTAINS 'SHORT_TERM'
+        // FIXED: Added parentheses so 'is_active = 1' applies to both EPHEMERAL and SHORT_TERM
+        WHERE m.is_active = 1 AND (m.metadata CONTAINS 'EPHEMERAL' OR m.metadata CONTAINS 'SHORT_TERM')
         WITH m,
              (m.importance_score * m.confidence * CASE WHEN 1.0 + (m.strength - 1.0) * 0.2 < 3.0 THEN 1.0 + (m.strength - 1.0) * 0.2 ELSE 3.0 END) / 
              (1.0 + (duration.between(m.last_accessed, datetime()).seconds / 86400.0) * 0.05) AS current_rank

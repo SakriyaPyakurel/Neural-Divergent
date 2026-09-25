@@ -1,7 +1,6 @@
 from typing import List,Dict,Any,Optional
 from dataclasses import dataclass
 import logging
-from sentence_transformers import SentenceTransformer
 #Importing finalized cognitive modules
 from app.services.extractor import LocalExtractionEngine
 from app.services.semantic_classifier import SemanticClassifier
